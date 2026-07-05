@@ -15,3 +15,5 @@ backend/dist/
 *.log
 coverage/
 *.zip
+
+tests/
