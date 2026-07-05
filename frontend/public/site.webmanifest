@@ -1,0 +1,13 @@
+{
+  "name": "EmberKids Chess Academy",
+  "short_name": "EmberKids",
+  "description": "Structured chess coaching for children — where grandmasters begin.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbf6ec",
+  "theme_color": "#c75d3c",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/apple-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,233 @@
+import mongoose, { Schema, Document, Model } from 'mongoose';
+
+export enum ClassStatus {
+  SCHEDULED = 'scheduled',
+  COMPLETED = 'completed',
+  MISSED = 'missed',
+  CANCELLED = 'cancelled',
+}
+
+export interface IClass extends Document {
+  students: mongoose.Types.ObjectId[];
+  batch?: mongoose.Types.ObjectId;
+  coach: mongoose.Types.ObjectId;
+  course: string;
+  date: Date;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  meetingLink?: string;
+  classType: 'regular' | 'master' | 'extra' | 'trial';
+  recordingLink?: string;
+  recordingFile?: string;
+  recordingUploadedAt?: Date;
+  recordingUploadedBy?: mongoose.Types.ObjectId;
+  status: ClassStatus;
+  notes?: string;
+  cancellationReason?: string;
+  rescheduledFrom?: {
+    date: Date;
+    startTime: string;
+    endTime: string;
+  };
+  // Trial-specific fields
+  leadId?: mongoose.Types.ObjectId;
+  trialResult?: 'recommended' | 'not_recommended' | 'needs_follow_up' | 'reschedule_requested' | 'expired' | 'pending';
+  trialResultNotes?: string;
+  trialResultMarkedBy?: mongoose.Types.ObjectId;
+  trialResultMarkedAt?: Date;
+  trialAttendanceStatus?: 'not_marked' | 'attended' | 'no_show';
+  // Trial join-tracking: separate from Attendance (Student-scoped, doesn't
+  // exist for a Lead) since a trial consumes no package credit - this is
+  // purely informational, confirming the lead actually showed up.
+  trialJoinedAt?: Date;
+  trialAttemptNumber?: number;
+  trialReminderSentAt?: Date;
+  trialExpiresAt?: Date;
+  // Class notes hub: coach's post-class notes/homework, broadcast to
+  // every enrolled student's dashboard the moment it's saved.
+  classNotes?: string;
+  classNotesPostedAt?: Date;
+  sessionNumber?: number;
+  batchProgressCounted: boolean;
+  createdBy: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const ClassSchema: Schema = new Schema(
+  {
+    // A class can have one or more students (e.g. a shared master/group
+    // class). Attendance is still tracked per-student via the Attendance
+    // model, which references both this class and an individual student.
+    // EXCEPTION: trial classes reference a Lead (no Student record exists
+    // yet), so students is legitimately empty until/unless the lead
+    // converts - the >0 rule below only applies to non-trial classes.
+    students: {
+      type: [{ type: Schema.Types.ObjectId, ref: 'Student' }],
+      default: [],
+      validate: {
+        validator: function (this: any, value: unknown[]) {
+          if (this.classType === 'trial') return true;
+          return Array.isArray(value) && value.length > 0;
+        },
+        message: 'At least one student must be assigned to a non-trial class',
+      },
+      index: true,
+    },
+    coach: {
+      type: Schema.Types.ObjectId,
+      ref: 'Staff',
+      required: true,
+      index: true,
+    },
+    batch: {
+      type: Schema.Types.ObjectId,
+      ref: 'Batch',
+      index: true,
+    },
+    course: {
+      type: String,
+      required: true,
+    },
+    date: {
+      type: Date,
+      required: true,
+      index: true,
+    },
+    startTime: {
+      type: String,
+      required: true,
+    },
+    endTime: {
+      type: String,
+      required: true,
+    },
+    timezone: {
+      type: String,
+      required: true,
+      default: 'America/New_York',
+    },
+    // Generic meeting link - the platform (Zoom, Google Meet, Teams, etc.)
+    // is entirely the academy's choice and is not modeled here on purpose.
+    meetingLink: {
+      type: String,
+    },
+    classType: {
+      type: String,
+      enum: ['regular', 'master', 'extra', 'trial'],
+      default: 'regular',
+      required: true,
+    },
+    recordingLink: {
+      type: String,
+    },
+    recordingFile: {
+      type: String,
+    },
+    recordingUploadedAt: {
+      type: Date,
+    },
+    recordingUploadedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'Staff',
+    },
+    status: {
+      type: String,
+      enum: Object.values(ClassStatus),
+      default: ClassStatus.SCHEDULED,
+      required: true,
+      index: true,
+    },
+    notes: {
+      type: String,
+    },
+    cancellationReason: {
+      type: String,
+    },
+    rescheduledFrom: {
+      date: { type: Date },
+      startTime: { type: String },
+      endTime: { type: String },
+    },
+    // Trial-specific fields
+    leadId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Lead',
+      index: true,
+    },
+    trialResult: {
+      type: String,
+      enum: ['recommended', 'not_recommended', 'needs_follow_up', 'reschedule_requested', 'expired', 'pending'],
+      default: 'pending',
+    },
+    trialResultNotes: {
+      type: String,
+    },
+    trialResultMarkedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'Staff',
+    },
+    trialResultMarkedAt: {
+      type: Date,
+    },
+    trialAttendanceStatus: {
+      type: String,
+      enum: ['not_marked', 'attended', 'no_show'],
+      default: 'not_marked',
+      index: true,
+    },
+    trialJoinedAt: {
+      type: Date,
+    },
+    trialAttemptNumber: {
+      type: Number,
+      min: 1,
+      default: 1,
+    },
+    trialReminderSentAt: {
+      type: Date,
+    },
+    trialExpiresAt: {
+      type: Date,
+      index: true,
+    },
+    classNotes: {
+      type: String,
+      trim: true,
+    },
+    classNotesPostedAt: {
+      type: Date,
+    },
+    sessionNumber: {
+      type: Number,
+      min: 1,
+    },
+    // A batch milestone is per class, not per student attendance row. This
+    // atomic marker prevents a group class from advancing the batch once for
+    // every student who clicks Join.
+    batchProgressCounted: {
+      type: Boolean,
+      default: false,
+      required: true,
+      index: true,
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'Staff',
+      required: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+ClassSchema.index({ coach: 1, date: 1, status: 1 });
+ClassSchema.index({ students: 1, date: 1, status: 1 });
+ClassSchema.index({ date: 1, startTime: 1, endTime: 1 });
+ClassSchema.index({ leadId: 1, classType: 1, status: 1, trialResult: 1 });
+
+const Class: Model<IClass> = mongoose.models.Class || mongoose.model<IClass>('Class', ClassSchema);
+
+export default Class;

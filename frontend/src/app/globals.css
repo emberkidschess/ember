@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Base & Backgrounds ── */
+  --color-ivory: #fbf6ec;
+  --color-ivory-deep: #f3ecdc;
+  --color-paper: #fffdf8;
+
+  /* ── Text ── */
+  --color-walnut: #1f1b16;
+  --color-walnut-soft: #3b332b;
+  --color-muted: #756a5d;
+
+  /* ── Accents ── */
+  --color-ember: #c75d3c;
+  --color-ember-deep: #a8472a;
+  --color-pine: #3f6b5c;
+  --color-pine-deep: #2e4f44;
+  --color-gold: #e0a33d;
+
+  /* ── Typography ── */
+  --font-playfair: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-dm-sans: "DM Sans", system-ui, sans-serif;
+
+  /* ── Borders & Dividers ── */
+  --color-line: rgba(31, 27, 22, 0.12);
+  --color-line-strong: rgba(31, 27, 22, 0.22);
+
+  /* ── Elevations ── */
+  --shadow-soft: 0 24px 70px -40px rgba(31, 27, 22, 0.45);
+  --shadow-card: 0 20px 45px -32px rgba(31, 27, 22, 0.5);
+}
+
+/* ── Base ── */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-walnut);
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+}
+
+/* ── Animations ── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.35s ease-out forwards;
+}
+
+/* Marquee */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 20s linear infinite;
+}
+
+/* Shimmer (for skeleton loaders) */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, var(--color-ivory) 25%, var(--color-ivory-deep) 50%, var(--color-ivory) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Float (for decorative elements) */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Pulse-glow */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(199, 93, 60, 0.4); }
+  50%       { box-shadow: 0 0 0 12px rgba(199, 93, 60, 0); }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ── Navbar scribble underline ── */
+.draw-path {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  transition: stroke-dashoffset 0.6s ease-in-out;
+}
+.path-active {
+  stroke-dashoffset: 0 !important;
+}
+.lg-nav-link:hover:not(.active) .draw-path {
+  stroke-dashoffset: 0;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

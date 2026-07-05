@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin/
+Disallow: /staff/
+Disallow: /student/
+Disallow: /api/
+
+Sitemap: https://emberkids.com/sitemap.xml
