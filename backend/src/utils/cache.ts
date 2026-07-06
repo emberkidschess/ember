@@ -20,7 +20,7 @@ export class CacheService {
       if (!client) return null;
 
       const value = await client.get(key);
-      if (!value) return null;
+      if (!value || typeof value !== 'string') return null;
 
       return JSON.parse(value) as T;
     } catch (error) {
