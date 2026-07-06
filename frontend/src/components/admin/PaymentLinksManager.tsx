@@ -201,15 +201,18 @@ function PaymentLinksContent() {
       if (channel === "copy_link") {
         const url = sendTarget.shareableUrl || `${window.location.origin}/pay/${sendTarget._id}`;
         await navigator.clipboard.writeText(url);
-      }
-
-      const res = await sendPaymentLink(sendTarget._id, [channel]);
-      if (res.success) {
         setSendDone((previous) =>
           previous.includes(channel) ? previous : [...previous, channel]
         );
-        void loadData();
-      } else setSendError(res.error || "Could not share the payment link.");
+      } else {
+        const res = await sendPaymentLink(sendTarget._id, [channel]);
+        if (res.success) {
+          setSendDone((previous) =>
+            previous.includes(channel) ? previous : [...previous, channel]
+          );
+          void loadData();
+        } else setSendError(res.error || "Could not share the payment link.");
+      }
     } catch (sendFailure) {
       setSendError(
         sendFailure instanceof Error
