@@ -178,7 +178,7 @@ export const defaultSiteConfig: SiteConfigResponse = {
     { name: 'Home', href: '/' },
     { name: 'Academy', href: '/about' },
     { name: 'Curriculum', href: '/courses' },
-    { name: 'Prodigies', href: '/about' },
+    { name: 'Prodigies', href: '/prodigies' },
     { name: 'Contact', href: '/contact' },
   ],
   primaryCta: { label: 'Book a Free Trial', href: '/contact' },
