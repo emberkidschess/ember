@@ -25,7 +25,6 @@ export const adminLogin = async (req: Request, res: Response) => {
     }
 
     setAuthCookies(res, 'admin', result.data.accessToken, result.data.refreshToken);
-    console.log('Cookies set for admin login');
 
     // Return user data without tokens in response body
     res.json({

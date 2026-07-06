@@ -97,7 +97,6 @@ export async function login(
   });
 
   const data: AuthResponse = await response.json();
-  console.log('Login response:', data);
 
   if (data.success && data.data) {
     // Tokens are now set as httpOnly cookies by the backend
