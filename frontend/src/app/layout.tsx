@@ -117,7 +117,7 @@ const jsonLd = {
   logo: "https://res.cloudinary.com/aaa97ofg/image/upload/v1783288889/chess-academy/fav.png",
   sameAs: [
     "https://www.instagram.com/emberkidsofficial",
-    "https://www.facebook.com/emberkids",
+    "#",
   ],
   offers: {
     "@type": "Offer",

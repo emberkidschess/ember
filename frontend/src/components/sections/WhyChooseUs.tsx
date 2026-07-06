@@ -24,9 +24,9 @@ const ADVANTAGES = [
   },
   {
     number: "04",
-    title: "USCF-Affiliated Prestige",
+    title: "Certified Excellence",
     description:
-      "Graduation concludes with an official USCF-affiliated certification — a tangible, respected credential of your child's strategic competence.",
+      "Graduation concludes with an official certification — a tangible, respected credential of your child's strategic competence and achievement.",
   },
 ];
 

@@ -43,7 +43,7 @@ export interface CtaProps {
   title: string | React.ReactNode;
   description?: string;
   buttonText: string;
-  buttonHref: string;
+  buttonHref?: string;
   onButtonClick?: () => void;
   className?: string;
 }

@@ -127,11 +127,9 @@ export default function Footer() {
 
               {/* Facebook */}
               <a
-                href="https://facebook.com/emberkids"
-                target="_blank"
-                rel="noopener noreferrer nofollow"
-                className="h-12 w-12 flex items-center justify-center rounded-xl bg-[var(--color-ivory)] border border-[var(--color-line)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-all"
-                aria-label="Follow us on Facebook"
+                href="#"
+                className="h-12 w-12 flex items-center justify-center rounded-xl bg-[var(--color-ivory)] border border-[var(--color-line)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-all opacity-50 cursor-not-allowed"
+                aria-label="Facebook (coming soon)"
               >
                 <FaFacebookF className="h-5 w-5" aria-hidden="true" />
               </a>

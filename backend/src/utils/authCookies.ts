@@ -23,10 +23,10 @@ function cookieOptions(maxAge: number): CookieOptions {
   const sameSite = sameSitePolicy();
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production' || sameSite === 'none',
+    secure: process.env.NODE_ENV === 'production',
     sameSite,
     maxAge,
-    path: '/api',
+    path: '/',
   };
 }
 
@@ -60,13 +60,24 @@ export function setAuthCookies(
   const names = scopedCookieNames(scope);
   const { maxAge: _maxAge, ...clearOptions } = cookieOptions(0);
 
+  console.log('Setting cookies for scope:', scope);
+  console.log('Cookie names:', names);
+  console.log('Access token length:', accessToken.length);
+  console.log('Refresh token length:', refreshToken.length);
+
   // Remove the legacy shared cookies so old deployments/sessions cannot keep
   // causing cross-portal overwrites after upgrading.
   res.clearCookie('accessToken', clearOptions);
   res.clearCookie('refreshToken', clearOptions);
 
-  res.cookie(names.access, accessToken, cookieOptions(ACCESS_TOKEN_MAX_AGE));
-  res.cookie(names.refresh, refreshToken, cookieOptions(REFRESH_TOKEN_MAX_AGE));
+  const accessOptions = cookieOptions(ACCESS_TOKEN_MAX_AGE);
+  const refreshOptions = cookieOptions(REFRESH_TOKEN_MAX_AGE);
+  console.log('Access cookie options:', accessOptions);
+  console.log('Refresh cookie options:', refreshOptions);
+
+  res.cookie(names.access, accessToken, accessOptions);
+  res.cookie(names.refresh, refreshToken, refreshOptions);
+  console.log('Cookies set successfully');
 }
 
 export function clearAuthCookies(res: Response, scope: AuthCookieScope): void {

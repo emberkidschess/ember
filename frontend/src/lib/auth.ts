@@ -97,6 +97,7 @@ export async function login(
   });
 
   const data: AuthResponse = await response.json();
+  console.log('Login response:', data);
 
   if (data.success && data.data) {
     // Tokens are now set as httpOnly cookies by the backend
@@ -125,6 +126,11 @@ export async function logout(portal: "admin" | "staff" = getPortal()): Promise<v
 }
 
 export async function refreshAccessToken(portal: "admin" | "staff" = getPortal()): Promise<boolean> {
+  // Don't attempt refresh if there's no user in localStorage
+  if (!getCurrentUser(portal)) {
+    return false;
+  }
+
   try {
     const response = await fetch(`${requireApiUrl()}/auth/${portal}/refresh`, {
       method: "POST",
@@ -134,7 +140,6 @@ export async function refreshAccessToken(portal: "admin" | "staff" = getPortal()
 
     // Handle 401/403 responses from refresh endpoint - token is expired or invalid
     if (response.status === 401 || response.status === 403) {
-      console.error("Refresh token expired or invalid, clearing session");
       clearUser(portal);
       return false;
     }

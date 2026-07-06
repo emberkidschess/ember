@@ -189,7 +189,7 @@ export default function Testimonials() {
                   </Avatar.Root>
                 ))}
                 <div className="w-9 h-9 rounded-full bg-[var(--color-ember)] border-2 border-[var(--color-paper)] flex items-center justify-center text-white text-[10px] font-bold shadow-sm">
-                  +500
+                  +5000
                 </div>
               </div>
               <div>

@@ -53,9 +53,9 @@ const fallbackRoadmap: RoadmapMilestone[] = [
 ];
 
 const BOTTOM_STATS = [
-  { icon: BrainCircuit, value: "Improved", label: "Focus & Math Skills" },
-  { icon: Target,       value: "1 : 4",    label: "Teacher–Student Ratio" },
-  { icon: Trophy,       value: "Aligned", label: "Tournament Curriculum" },
+  { icon: BrainCircuit, value: "Proven", label: "Focus & Math" },
+  { icon: Target,       value: "Expert", label: "Guidance" },
+  { icon: Trophy,       value: "Strategic", label: "Training" },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────

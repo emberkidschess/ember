@@ -148,7 +148,7 @@ export interface NavigationItem {
 
 export interface CTA {
   label: string;
-  href: string;
+  href?: string;
 }
 
 export interface SocialLink {

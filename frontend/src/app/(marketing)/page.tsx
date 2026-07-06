@@ -18,7 +18,6 @@ export default function Page() {
         title="Ready to make your first move?"
         description="Book a guided assessment and see how EmberKids can shape focus, confidence, and competitive thinking."
         buttonText="Book Free Trial"
-        buttonHref="/contact"
         className="pb-20"
       />
       <BookFreeTrial isOpen={isTrialModalOpen} onClose={() => setIsTrialModalOpen(false)} />
