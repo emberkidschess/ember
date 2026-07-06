@@ -1,5 +1,8 @@
-import dotenv from 'dotenv';
-dotenv.config();
+// Load environment variables
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
 import express, { Application } from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
