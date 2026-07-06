@@ -1,8 +1,4 @@
-// Load environment variables
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
-}
-
+// Environment variables are provided by Render in production
 import express, { Application } from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
