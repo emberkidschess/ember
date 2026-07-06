@@ -28,6 +28,7 @@ import {
   getAllowedSessionPlans,
   type CourseLevel,
 } from "@/lib/courseEnrollment";
+import { formatCourseLevel } from "@/lib/labels";
 
 const PACKAGE_STATUSES: StudentPackage["status"][] = ["active", "queued", "completed", "expired", "upgraded"];
 
@@ -227,7 +228,7 @@ export default function PackagesPage() {
                   <tr key={pkg._id} className="hover:bg-gray-50">
                     <td className="whitespace-nowrap px-6 py-4 font-medium text-gray-900">{studentName(pkg)}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-gray-500">{pkg.packageType}</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-gray-500">{pkg.courseLevel}</td>
+                    <td className="whitespace-nowrap px-6 py-4 text-gray-500">{formatCourseLevel(pkg.courseLevel)}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-gray-500">
                       {pkg.regularClassesCompleted}/{pkg.totalClasses}
                     </td>

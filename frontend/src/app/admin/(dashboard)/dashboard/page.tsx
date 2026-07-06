@@ -23,6 +23,7 @@ import StatCard from "@/components/admin/StatCard";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { getAdminDashboard, getPendingActivations, type PaymentLink } from "@/lib/adminApi";
 import { formatCurrency } from "@/lib/currency";
+import { formatCourseLevel, toTitleLabel } from "@/lib/labels";
 
 function formatRevenueByCurrency(value: unknown): string {
   if (!value || typeof value !== "object") return "—";
@@ -124,7 +125,7 @@ export default function AdminDashboardPage() {
                     <p className="font-medium text-sm text-[var(--color-walnut)] truncate">
                       {link.student?.studentName || "Unknown student"}
                     </p>
-                    <p className="text-xs text-[var(--color-muted)] truncate">{link.packageType} · {link.courseLevel}</p>
+                    <p className="text-xs text-[var(--color-muted)] truncate">{link.packageType} · {formatCourseLevel(link.courseLevel)}</p>
                   </div>
                   <StatusBadge status={link.status} />
                 </div>
@@ -146,7 +147,7 @@ export default function AdminDashboardPage() {
                 <div key={lead._id} className="px-5 py-3.5 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium text-sm text-[var(--color-walnut)] truncate">{lead.studentName}</p>
-                    <p className="text-xs text-[var(--color-muted)] truncate">{lead.courseInterest}</p>
+                    <p className="text-xs text-[var(--color-muted)] truncate">{toTitleLabel(lead.courseInterest)}</p>
                   </div>
                   <StatusBadge status={lead.status} />
                 </div>

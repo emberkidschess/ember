@@ -35,6 +35,8 @@ export default function TestimonialCard({ item, className = "" }: TestimonialCar
             src={item.imageUrl}
             alt=""
             aria-hidden="true"
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover"
             onError={() => setImageError(true)}
           />
@@ -47,6 +49,8 @@ export default function TestimonialCard({ item, className = "" }: TestimonialCar
             src="https://res.cloudinary.com/aaa97ofg/image/upload/v1783288892/chess-academy/hero.png"
             alt=""
             aria-hidden="true"
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover"
             onError={() => setImageError(true)}
           />

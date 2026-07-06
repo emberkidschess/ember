@@ -32,6 +32,9 @@ import {
   assertPackageCanUpgrade,
 } from '../services/enrollmentLifecycleService';
 
+type PaymentLinkShareChannel = 'email' | 'whatsapp' | 'copy_link';
+type PaymentLinkDeliveryFailure = { channel: PaymentLinkShareChannel; error: string };
+
 function sendPaymentLinkError(res: Response, error: unknown, fallback: string) {
   const isRuleError = error instanceof EnrollmentRuleError;
   return res.status(isRuleError ? 400 : 500).json({
@@ -423,7 +426,7 @@ export const createPaymentLink = async (req: AuthRequest, res: Response) => {
  */
 export const sendPaymentLink = async (req: AuthRequest, res: Response) => {
   try {
-    const { channels } = req.body as { channels: ('email' | 'whatsapp' | 'copy_link')[] };
+    const { channels } = req.body as { channels: PaymentLinkShareChannel[] };
 
     const paymentLink = await PaymentLink.findById(req.params.id);
     if (!paymentLink) {
@@ -470,22 +473,65 @@ export const sendPaymentLink = async (req: AuthRequest, res: Response) => {
       paymentDetails: wisePaymentService.getPaymentDetails(),
     };
 
-    if (channels.includes('email')) {
-      await emailService.sendTemplatedEmail(contact.email, 'payment_link_sent', templateData);
-    }
-    if (channels.includes('whatsapp')) {
-      await whatsappService.sendMessage(
-        contact.phone,
-        [
-          `Chess Academy payment link for ${studentName}`,
-          `${paymentLink.currency} ${paymentLink.amount} · ${paymentLink.packageType || 'Chess package'}`,
-          paymentInstructions,
-          `View payment details: ${paymentUrl}`,
-        ].filter(Boolean).join('\n\n')
-      );
+    const deliveredChannels: PaymentLinkShareChannel[] = [];
+    const failedDeliveries: PaymentLinkDeliveryFailure[] = [];
+
+    if (channels.includes('copy_link')) {
+      deliveredChannels.push('copy_link');
     }
 
-    paymentLink.sentVia = Array.from(new Set([...(paymentLink.sentVia || []), ...channels]));
+    if (channels.includes('email')) {
+      try {
+        await emailService.sendTemplatedEmail(contact.email, 'payment_link_sent', templateData);
+        deliveredChannels.push('email');
+      } catch (emailError) {
+        console.error('Payment link email delivery failed:', emailError);
+        failedDeliveries.push({
+          channel: 'email',
+          error: emailError instanceof Error ? emailError.message : 'Email delivery failed',
+        });
+      }
+    }
+
+    if (channels.includes('whatsapp')) {
+      try {
+        await whatsappService.sendMessage(
+          contact.phone,
+          [
+            `Chess Academy payment link for ${studentName}`,
+            `${paymentLink.currency} ${paymentLink.amount} · ${paymentLink.packageType || 'Chess package'}`,
+            paymentInstructions,
+            `View payment details: ${paymentUrl}`,
+          ].filter(Boolean).join('\n\n')
+        );
+        deliveredChannels.push('whatsapp');
+      } catch (whatsappError) {
+        console.error('Payment link WhatsApp delivery failed:', whatsappError);
+        failedDeliveries.push({
+          channel: 'whatsapp',
+          error: whatsappError instanceof Error ? whatsappError.message : 'WhatsApp delivery failed',
+        });
+      }
+    }
+
+    if (deliveredChannels.length === 0) {
+      await AuditLog.create(buildAuditLogData(req, {
+        action: AuditAction.UPDATE,
+        entityType: AuditEntityType.PAYMENT_LINK,
+        entityId: paymentLink._id,
+        entityName: `Payment link delivery failed via ${channels.join(', ')}`,
+        details: { channels, deliveredChannels, failedDeliveries },
+        success: false,
+      }));
+
+      return res.status(502).json({
+        success: false,
+        error: failedDeliveries[0]?.error || 'Could not share the payment link',
+        deliveryResults: { deliveredChannels, failedDeliveries },
+      });
+    }
+
+    paymentLink.sentVia = Array.from(new Set([...(paymentLink.sentVia || []), ...deliveredChannels]));
     paymentLink.sentAt = new Date();
     await paymentLink.save();
 
@@ -493,15 +539,21 @@ export const sendPaymentLink = async (req: AuthRequest, res: Response) => {
       action: AuditAction.UPDATE,
       entityType: AuditEntityType.PAYMENT_LINK,
       entityId: paymentLink._id,
-      entityName: `Payment link sent via ${channels.join(', ')}`,
-      details: { channels },
+      entityName: `Payment link sent via ${deliveredChannels.join(', ')}`,
+      details: { channels, deliveredChannels, failedDeliveries },
       success: true,
     }));
+
+    const message =
+      failedDeliveries.length > 0
+        ? `Payment link shared via ${deliveredChannels.join(', ')}. ${failedDeliveries.map((item) => `${item.channel}: ${item.error}`).join(' ')}`
+        : 'Payment link shared successfully';
 
     res.json({
       success: true,
       data: paymentLink,
-      message: 'Payment link shared successfully',
+      message,
+      deliveryResults: { deliveredChannels, failedDeliveries },
     });
   } catch (error) {
     console.error('Error sending payment link:', error);

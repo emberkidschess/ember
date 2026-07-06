@@ -7,6 +7,7 @@ import { StaffAuthService } from '../services/staffAuthService';
 import AuditLog, { AuditAction, AuditEntityType } from '../models/AuditLog';
 import crypto from 'crypto';
 import { buildAuditLogData } from '../middleware/auditLogger';
+import emailService from '../services/emailService';
 
 export const getStaff = async (req: AuthRequest, res: Response) => {
   try {
@@ -133,6 +134,17 @@ export const createStaff = async (req: AuthRequest, res: Response) => {
       entityName: staff.name,
       success: true,
     }));
+
+    try {
+      await emailService.sendTemplatedEmail(staff.email, 'staff_credentials_created', {
+        name: staff.name,
+        email: staff.email,
+        roleLabel: staff.role === StaffRole.COACH ? 'Coach' : 'Staff',
+        tempPassword,
+      });
+    } catch (emailError) {
+      console.error('Failed to send staff credentials email:', emailError);
+    }
 
     res.status(201).json({
       success: true,
@@ -351,6 +363,16 @@ export const resetStaffPassword = async (req: AuthRequest, res: Response) => {
       entityName: staff.name,
       success: true,
     }));
+
+    try {
+      await emailService.sendTemplatedEmail(staff.email, 'staff_password_reset', {
+        name: staff.name,
+        email: staff.email,
+        tempPassword,
+      });
+    } catch (emailError) {
+      console.error('Failed to send staff password reset email:', emailError);
+    }
 
     res.json({
       success: true,

@@ -5,6 +5,7 @@ import { Loader2, Search, Calendar, Users } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { getBatches, type Batch } from "@/lib/adminApi";
+import { formatCourseLevel } from "@/lib/labels";
 
 export default function StaffBatchesPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -87,7 +88,7 @@ export default function StaffBatchesPage() {
             {filteredBatches.map((batch) => (
               <tr key={batch._id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{batch.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-500">{batch.courseLevel}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-500">{formatCourseLevel(batch.courseLevel)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4" />

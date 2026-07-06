@@ -11,6 +11,7 @@ import type { ContactItem } from "@/types";
 import { submitInquiry } from "@/lib/api";
 import { useSiteConfig } from "@/lib/site";
 import { COUNTRY_OPTIONS, formatPhoneInput, type SupportedCountry } from "@/lib/phone";
+import { CANONICAL_INSTAGRAM_URL, getSocialHref } from "@/lib/socialLinks";
 
 const NEXT_STEPS = [
   { icon: MessageSquare, title: "We Review", desc: "Our team reviews your inquiry within 24 hours." },
@@ -27,6 +28,7 @@ export default function ContactPage() {
   });
   const { siteConfig } = useSiteConfig();
   const profile = siteConfig?.profile;
+  const instagramHref = getSocialHref(siteConfig?.socialLinks, "instagram", CANONICAL_INSTAGRAM_URL);
 
   const hasPhone = Boolean(profile?.phone && profile.phoneHref?.startsWith("tel:"));
   const hasWhatsapp = Boolean(profile?.whatsappHref?.startsWith("https://"));
@@ -217,7 +219,7 @@ export default function ContactPage() {
             {/* Instagram */}
             <motion.div variants={fadeUp}>
               <a
-                href="https://www.instagram.com/emberkids"
+                href={instagramHref}
                 target="_blank" rel="noopener noreferrer"
                 className="flex items-center justify-center gap-3 w-full rounded-3xl bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] text-white font-bold py-4 px-6 text-sm uppercase tracking-wider hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
               >

@@ -29,6 +29,7 @@ import {
 } from "@/lib/adminApi";
 import { COUNTRY_OPTIONS, formatPhoneInput } from "@/lib/phone";
 import { formatCurrency } from "@/lib/currency";
+import { formatCourseLevel, toTitleLabel } from "@/lib/labels";
 import Link from "next/link";
 
 type Tab = "personal" | "course" | "payments" | "attendance" | "classes" | "notifications" | "reports" | "timeline";
@@ -356,9 +357,9 @@ export default function StudentProfilePage() {
               { label: "Email", value: student.email },
               { label: "Phone", value: `${dialCode} ${formatPhoneInput(student.phoneNumber, (student.country as any) || "US")}` },
               { label: "Country", value: COUNTRY_OPTIONS.find((c) => c.code === student.country)?.label || student.country || "—" },
-              { label: "Course", value: student.course },
-              { label: "Enrolled", value: student.enrollmentStatus },
-              { label: "Status", value: student.studentStatus },
+              { label: "Course", value: toTitleLabel(student.course) },
+              { label: "Enrolled", value: toTitleLabel(student.enrollmentStatus) },
+              { label: "Status", value: toTitleLabel(student.studentStatus) },
               { label: "Notes", value: (student as any).notes || "—" },
             ].map(({ label, value }) => (
               <div key={label}>
@@ -375,8 +376,8 @@ export default function StudentProfilePage() {
               <div className="grid sm:grid-cols-2 gap-x-8 gap-y-5">
                 {[
                   { label: "Package Type", value: pkg.packageType },
-                  { label: "Course Level", value: pkg.courseLevel },
-                  { label: "Status", value: pkg.status },
+                  { label: "Course Level", value: formatCourseLevel(pkg.courseLevel) },
+                  { label: "Status", value: toTitleLabel(pkg.status) },
                   { label: "Purchased Sessions", value: String(pkg.totalClasses ?? "—") },
                   { label: "Sessions Used", value: String(pkg.completedClasses ?? "—") },
                   { label: "Sessions Remaining", value: String(pkg.remainingClasses ?? "—") },

@@ -25,6 +25,7 @@ import {
   type StudentPackage,
 } from "@/lib/adminApi";
 import { hasPermission } from "@/lib/auth";
+import { formatCourseLevel } from "@/lib/labels";
 
 type ReportForm = Omit<EvaluationReportPayload, "strengths" | "weaknesses"> & {
   strengths: string;
@@ -51,7 +52,7 @@ function entityName(entity: EvaluationReport["student"] | EvaluationReport["coac
 }
 
 function packageLabel(pkg: EvaluationReport["package"]) {
-  return typeof pkg === "string" ? "Package" : `${pkg.packageType} · ${pkg.courseLevel}`;
+  return typeof pkg === "string" ? "Package" : `${pkg.packageType} · ${formatCourseLevel(pkg.courseLevel)}`;
 }
 
 function splitList(value: string) {
@@ -307,7 +308,7 @@ export default function StaffReportCardsPage() {
             <select required disabled={Boolean(editingReport)} value={form.package} onChange={(event) => selectPackage(event.target.value)} className={selectClass}>
               <option value="">Select a completed package</option>
               {eligiblePackages.map((pkg) => (
-                <option key={pkg._id} value={pkg._id}>{typeof pkg.student === "string" ? "Student" : pkg.student.studentName} — {pkg.packageType} ({pkg.courseLevel})</option>
+                <option key={pkg._id} value={pkg._id}>{typeof pkg.student === "string" ? "Student" : pkg.student.studentName} — {pkg.packageType} ({formatCourseLevel(pkg.courseLevel)})</option>
               ))}
             </select>
           </FormField>

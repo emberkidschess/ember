@@ -7,6 +7,7 @@ import StatusBadge from "@/components/admin/StatusBadge";
 import { getBatchHistory, type Batch } from "@/lib/adminApi";
 import Link from "next/link";
 import { secondaryButtonClass } from "@/components/admin/FormField";
+import { formatCourseLevel } from "@/lib/labels";
 
 export default function BatchHistoryPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -69,7 +70,7 @@ export default function BatchHistoryPage() {
                       <p className="font-medium text-[var(--color-walnut)]">{batch.name}</p>
                       {batch.schedule && <p className="text-xs text-[var(--color-muted)]">{batch.schedule}</p>}
                     </td>
-                    <td className="px-5 py-3.5 text-[var(--color-walnut)]">{batch.courseLevel}</td>
+                    <td className="px-5 py-3.5 text-[var(--color-walnut)]">{formatCourseLevel(batch.courseLevel)}</td>
                     <td className="px-5 py-3.5 text-[var(--color-walnut)]">
                       {typeof batch.coach === "object" ? batch.coach.name : "—"}
                     </td>

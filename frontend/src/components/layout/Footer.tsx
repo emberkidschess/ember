@@ -5,6 +5,7 @@ import Image from "next/image";
 import { FaFacebookF, FaInstagram, FaWhatsapp } from "react-icons/fa6";
 import { Mail, Phone, MapPin, ChevronRight } from "lucide-react";
 import { useSiteConfig } from "@/lib/site";
+import { CANONICAL_INSTAGRAM_URL, getSocialHref } from "@/lib/socialLinks";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -15,6 +16,7 @@ export default function Footer() {
   const contactPhone = profile?.phone;
   const contactPhoneHref = profile?.phoneHref;
   const contactWhatsappHref = profile?.whatsappHref;
+  const instagramHref = getSocialHref(siteConfig?.socialLinks, "instagram", CANONICAL_INSTAGRAM_URL);
   const hasPhone = Boolean(contactPhone && contactPhoneHref?.startsWith("tel:"));
   const hasWhatsapp = Boolean(contactWhatsappHref?.startsWith("https://"));
   const serviceArea = "Serving students across the US & Canada";
@@ -149,7 +151,7 @@ export default function Footer() {
 
               {/* Instagram */}
               <a
-                href="https://instagram.com/emberkidsofficial"
+                href={instagramHref}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
                 className="h-12 w-12 flex items-center justify-center rounded-xl bg-[var(--color-ivory)] border border-[var(--color-line)] hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-all"

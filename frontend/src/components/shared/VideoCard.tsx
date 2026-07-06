@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Video } from "lucide-react";
 import type { Testimonial } from "@/types";
 
 interface VideoCardProps {
@@ -77,6 +77,11 @@ export default function VideoCard({ item, className = "" }: VideoCardProps) {
       role="article"
       aria-label={`Video testimonial from ${item.name}`}
     >
+      <div className="pointer-events-none absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/25 px-3 py-1.5 text-xs font-semibold text-white shadow-lg backdrop-blur-md">
+        <Video className="h-4 w-4 text-[var(--color-gold)]" aria-hidden="true" />
+        Video story
+      </div>
+
       {/* Video Element */}
       <video
         ref={videoRef}
@@ -108,10 +113,10 @@ export default function VideoCard({ item, className = "" }: VideoCardProps) {
       {isPlaying && (
         <button
           onClick={handlePlay}
-          className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/30 flex items-center justify-center hover:bg-black/70 transition-all duration-300"
+          className="absolute right-4 top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-white/15 text-white shadow-[0_16px_40px_-18px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-[var(--color-ember)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
           aria-label="Pause video"
         >
-          <Pause className="w-5 h-5 text-white" />
+          <Pause className="h-5 w-5 fill-white text-white" />
         </button>
       )}
 
@@ -125,11 +130,12 @@ export default function VideoCard({ item, className = "" }: VideoCardProps) {
           {/* Play Button */}
           <button
             onClick={handlePlay}
-            className="absolute inset-0 flex items-center justify-center pointer-events-auto group/play"
+            className="absolute inset-0 flex items-center justify-center pointer-events-auto group/play focus-visible:outline-none"
             aria-label="Play video"
           >
-            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md border-2 border-white/30 flex items-center justify-center hover:bg-[var(--color-ember)] hover:border-[var(--color-ember)] hover:scale-110 transition-all duration-300">
-              <Play className="w-8 h-8 text-white fill-white translate-x-1" />
+            <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-white/35 bg-white/15 text-white shadow-[0_24px_70px_-24px_rgba(0,0,0,0.9)] backdrop-blur-md transition-all duration-300 group-hover/play:scale-105 group-hover/play:border-[var(--color-ember)] group-hover/play:bg-[var(--color-ember)] group-focus-visible/play:ring-2 group-focus-visible/play:ring-white/80">
+              <span className="absolute inset-0 rounded-full border border-white/25 animate-ping opacity-40" aria-hidden="true" />
+              <Play className="h-8 w-8 translate-x-0.5 fill-white text-white" strokeWidth={1.8} />
             </div>
           </button>
 

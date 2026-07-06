@@ -33,6 +33,7 @@ import {
   getAllowedSessionPlans,
   type CourseLevel,
 } from "@/lib/courseEnrollment";
+import { formatCourseLevel } from "@/lib/labels";
 
 const PURPOSES = ["new_package", "renewal", "upgrade"];
 
@@ -41,6 +42,34 @@ function contactNameOf(link: PaymentLink): string {
     return typeof link.lead === "object" ? link.lead?.studentName || "—" : "—";
   }
   return typeof link.student === "object" ? link.student?.studentName || "—" : "—";
+}
+
+async function copyTextToClipboard(text: string): Promise<void> {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    throw new Error("Clipboard is not available in this browser.");
+  }
+
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+
+  if (!copied) {
+    throw new Error("Could not copy the payment link. Please select and copy it manually.");
+  }
 }
 
 function PaymentLinksContent() {
@@ -71,8 +100,10 @@ function PaymentLinksContent() {
 
   const [sendTarget, setSendTarget] = useState<PaymentLink | null>(null);
   const [sending, setSending] = useState(false);
+  const [sendingChannel, setSendingChannel] = useState<"email" | "whatsapp" | "copy_link" | null>(null);
   const [sendDone, setSendDone] = useState<string[]>([]);
   const [sendError, setSendError] = useState("");
+  const [sendInfo, setSendInfo] = useState("");
 
   const [markPaidTarget, setMarkPaidTarget] = useState<PaymentLink | null>(null);
   const [markPaidReference, setMarkPaidReference] = useState("");
@@ -178,6 +209,8 @@ function PaymentLinksContent() {
     setSendTarget(link);
     setSendDone([]);
     setSendError("");
+    setSendInfo("");
+    setSendingChannel(null);
   };
 
   const openMarkPaid = (link: PaymentLink) => {
@@ -196,22 +229,33 @@ function PaymentLinksContent() {
     if (!sendTarget) return;
 
     setSendError("");
+    setSendInfo("");
     setSending(true);
+    setSendingChannel(channel);
     try {
       if (channel === "copy_link") {
         const url = sendTarget.shareableUrl || `${window.location.origin}/pay/${sendTarget._id}`;
-        await navigator.clipboard.writeText(url);
+        await copyTextToClipboard(url);
         setSendDone((previous) =>
           previous.includes(channel) ? previous : [...previous, channel]
         );
+        setSendInfo("Payment link copied.");
+        void sendPaymentLink(sendTarget._id, [channel]).then((res) => {
+          if (res.success) void loadData();
+        });
       } else {
         const res = await sendPaymentLink(sendTarget._id, [channel]);
         if (res.success) {
           setSendDone((previous) =>
             previous.includes(channel) ? previous : [...previous, channel]
           );
+          const failed = res.deliveryResults?.failedDeliveries || [];
+          setSendInfo(failed.length > 0 ? res.message || "Payment link shared with one warning." : res.message || "Payment link shared successfully.");
           void loadData();
-        } else setSendError(res.error || "Could not share the payment link.");
+        } else {
+          const failure = res.deliveryResults?.failedDeliveries?.find((item) => item.channel === channel);
+          setSendError(failure?.error || res.error || "Could not share the payment link.");
+        }
       }
     } catch (sendFailure) {
       setSendError(
@@ -221,6 +265,7 @@ function PaymentLinksContent() {
       );
     } finally {
       setSending(false);
+      setSendingChannel(null);
     }
   };
 
@@ -358,7 +403,7 @@ function PaymentLinksContent() {
                         {link.purpose === "new_package" ? "New" : link.purpose}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-[var(--color-muted)]">{link.packageType || "—"} · {link.courseLevel}</td>
+                    <td className="px-5 py-3.5 text-[var(--color-muted)]">{link.packageType || "—"} · {formatCourseLevel(link.courseLevel)}</td>
                     <td className="px-5 py-3.5 text-[var(--color-walnut)]">{formatCurrency(link.amount, link.currency)}</td>
                     <td className="px-5 py-3.5 text-[var(--color-muted)]">Wise</td>
                     <td className="px-5 py-3.5"><StatusBadge status={link.status} /></td>
@@ -534,34 +579,42 @@ function PaymentLinksContent() {
             {sendError}
           </div>
         )}
+        {sendInfo && (
+          <div className="mb-4 rounded-xl bg-[var(--color-pine)]/10 px-4 py-3 text-sm text-[var(--color-pine-deep)]">
+            {sendInfo}
+          </div>
+        )}
         <div className="space-y-2.5">
           <button
+            type="button"
             onClick={() => handleSend("whatsapp")}
             disabled={sending}
             className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-[var(--color-line)] hover:bg-[var(--color-ivory)] transition-colors text-sm font-medium text-[var(--color-walnut)]"
           >
             <span className="flex items-center gap-2.5"><MessageCircle className="h-4 w-4 text-[var(--color-pine-deep)]" /> WhatsApp</span>
-            {sendDone.includes("whatsapp") && <Check className="h-4 w-4 text-[var(--color-pine-deep)]" />}
+            {sendingChannel === "whatsapp" ? <Loader2 className="h-4 w-4 animate-spin text-[var(--color-muted)]" /> : sendDone.includes("whatsapp") && <Check className="h-4 w-4 text-[var(--color-pine-deep)]" />}
           </button>
           <button
+            type="button"
             onClick={() => handleSend("email")}
             disabled={sending}
             className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-[var(--color-line)] hover:bg-[var(--color-ivory)] transition-colors text-sm font-medium text-[var(--color-walnut)]"
           >
             <span className="flex items-center gap-2.5"><Mail className="h-4 w-4 text-[var(--color-ember)]" /> Email</span>
-            {sendDone.includes("email") && <Check className="h-4 w-4 text-[var(--color-pine-deep)]" />}
+            {sendingChannel === "email" ? <Loader2 className="h-4 w-4 animate-spin text-[var(--color-muted)]" /> : sendDone.includes("email") && <Check className="h-4 w-4 text-[var(--color-pine-deep)]" />}
           </button>
           <button
+            type="button"
             onClick={() => handleSend("copy_link")}
             disabled={sending}
             className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-[var(--color-line)] hover:bg-[var(--color-ivory)] transition-colors text-sm font-medium text-[var(--color-walnut)]"
           >
             <span className="flex items-center gap-2.5"><LinkIcon className="h-4 w-4 text-[var(--color-muted)]" /> Copy Link</span>
-            {sendDone.includes("copy_link") && <Check className="h-4 w-4 text-[var(--color-pine-deep)]" />}
+            {sendingChannel === "copy_link" ? <Loader2 className="h-4 w-4 animate-spin text-[var(--color-muted)]" /> : sendDone.includes("copy_link") && <Check className="h-4 w-4 text-[var(--color-pine-deep)]" />}
           </button>
         </div>
         <div className="flex justify-end mt-5">
-          <button onClick={() => setSendTarget(null)} className={secondaryButtonClass}>Done</button>
+          <button type="button" onClick={() => setSendTarget(null)} className={secondaryButtonClass}>Done</button>
         </div>
       </Modal>
 
@@ -635,7 +688,7 @@ function PaymentLinksContent() {
                 <option value="">Select a matching batch...</option>
                 {availableActivationBatches.map((batch) => (
                   <option key={batch._id} value={batch._id}>
-                    {batch.name} · {batch.courseLevel} · {getBatchCoachName(batch)}
+                    {batch.name} · {formatCourseLevel(batch.courseLevel)} · {getBatchCoachName(batch)}
                   </option>
                 ))}
               </select>

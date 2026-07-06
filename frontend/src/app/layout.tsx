@@ -4,6 +4,7 @@ import "./globals.css";
 import "react-toastify/dist/ReactToastify.css";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ErrorFallback from "@/components/ErrorFallback";
+import { CANONICAL_INSTAGRAM_URL } from "@/lib/socialLinks";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -116,7 +117,7 @@ const jsonLd = {
   url: SITE_URL,
   logo: "https://res.cloudinary.com/aaa97ofg/image/upload/v1783288889/chess-academy/fav.png",
   sameAs: [
-    "https://www.instagram.com/emberkidsofficial",
+    CANONICAL_INSTAGRAM_URL,
     "#",
   ],
   offers: {

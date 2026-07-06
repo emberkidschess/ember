@@ -8,6 +8,7 @@ import Modal from "@/components/admin/Modal";
 import { primaryButtonClass, secondaryButtonClass, textareaClass } from "@/components/admin/FormField";
 import { freezeStudentPortal, getStudents, unfreezeStudentPortal, type Student } from "@/lib/adminApi";
 import { hasPermission } from "@/lib/auth";
+import { formatCourseLevel, toTitleLabel } from "@/lib/labels";
 
 export default function StaffStudentsPage() {
   const canFreeze = hasPermission("freeze_student_portal");
@@ -147,7 +148,9 @@ export default function StaffStudentsPage() {
                     {student.phoneNumber}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-500">{student.courseLevel || student.course}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                  {student.courseLevel ? formatCourseLevel(student.courseLevel) : toTitleLabel(student.course)}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex flex-col items-start gap-1">
                     <StatusBadge status={student.status || student.studentStatus || student.enrollmentStatus} />

@@ -1,8 +1,39 @@
 import { Request, Response } from 'express';
 import { SiteConfig } from '../models/SiteConfig';
-import type { ApiResponse, SiteConfigResponse } from '../types';
-import { defaultSiteConfig } from '../data/defaults';
+import type { ApiResponse, SiteConfigResponse, SiteProfile, SocialLink } from '../types';
+import { buildDefaultSocialLinks, defaultSiteConfig, normalizeInstagramHref } from '../data/defaults';
 import { siteConfigSchema } from '../validations/schemas';
+
+function toPlainSocialLink(link: unknown): SocialLink | null {
+  const value =
+    link && typeof link === 'object' && 'toObject' in link && typeof link.toObject === 'function'
+      ? link.toObject()
+      : link;
+
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<SocialLink>;
+  if (!candidate.name || !candidate.href || !candidate.type) return null;
+
+  return {
+    name: candidate.name,
+    href: candidate.type === 'instagram' ? normalizeInstagramHref(candidate.href) : candidate.href,
+    type: candidate.type,
+    external: candidate.external ?? true,
+  };
+}
+
+function normalizeSocialLinks(profile: SiteProfile, socialLinks: unknown[]): SocialLink[] {
+  const linksByType = new Map<SocialLink['type'], SocialLink>(
+    buildDefaultSocialLinks(profile).map((link) => [link.type, link])
+  );
+
+  for (const link of socialLinks) {
+    const plain = toPlainSocialLink(link);
+    if (plain) linksByType.set(plain.type, plain);
+  }
+
+  return Array.from(linksByType.values());
+}
 
 export const getSiteConfig = async (
   req: Request,
@@ -20,7 +51,7 @@ export const getSiteConfig = async (
       navigation: config.navigation,
       primaryCta: config.primaryCta,
       secondaryCta: config.secondaryCta,
-      socialLinks: config.socialLinks,
+      socialLinks: normalizeSocialLinks(config.profile, config.socialLinks || []),
     };
 
     res.json({
@@ -54,7 +85,7 @@ export const updateSiteConfig = async (
       navigation: config.navigation,
       primaryCta: config.primaryCta,
       secondaryCta: config.secondaryCta,
-      socialLinks: config.socialLinks,
+      socialLinks: normalizeSocialLinks(config.profile, config.socialLinks || []),
     };
 
     res.json({

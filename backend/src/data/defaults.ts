@@ -4,6 +4,8 @@ import type {
   ProdigySpotlight,
   ProdigyCard,
   Testimonial,
+  SiteProfile,
+  SocialLink,
   SiteConfigResponse,
 } from '../types';
 
@@ -162,18 +164,64 @@ export const defaultTestimonials: Testimonial[] = [
   }
 ];
 
+export const CANONICAL_INSTAGRAM_URL =
+  process.env.PUBLIC_INSTAGRAM_URL || 'https://www.instagram.com/emberkidsofficial';
+
+export function normalizeInstagramHref(href?: string | null): string {
+  if (!href) return CANONICAL_INSTAGRAM_URL;
+
+  try {
+    const url = new URL(href);
+    const hostname = url.hostname.replace(/^www\./, '').toLowerCase();
+    const pathname = url.pathname.replace(/\/+$/, '').toLowerCase();
+
+    if (hostname === 'instagram.com' && ['/emberkids', '/emberkidsofficial'].includes(pathname)) {
+      return CANONICAL_INSTAGRAM_URL;
+    }
+  } catch {
+    return href;
+  }
+
+  return href;
+}
+
+export function buildDefaultSocialLinks(profile: Pick<SiteProfile, 'email' | 'whatsappHref'>): SocialLink[] {
+  return [
+    {
+      name: 'Email',
+      href: `mailto:${profile.email}`,
+      type: 'mail',
+      external: true,
+    },
+    {
+      name: 'WhatsApp',
+      href: profile.whatsappHref,
+      type: 'whatsapp',
+      external: true,
+    },
+    {
+      name: 'Instagram',
+      href: CANONICAL_INSTAGRAM_URL,
+      type: 'instagram',
+      external: true,
+    },
+  ];
+}
+
+const defaultSiteProfile: SiteProfile = {
+  name: 'Chess Academy',
+  fullName: 'Chess Academy International',
+  tagline: 'Building champions, one move at a time',
+  description: 'Premium online chess coaching for young minds.',
+  email: process.env.PUBLIC_CONTACT_EMAIL || 'hello@emberkids.com',
+  phone: process.env.PUBLIC_CONTACT_PHONE || '+91 88240 44647',
+  phoneHref: process.env.PUBLIC_CONTACT_PHONE_HREF || 'tel:+918824044647',
+  whatsappHref: process.env.PUBLIC_WHATSAPP_URL || 'https://wa.me/918824044647',
+  supportLine: process.env.PUBLIC_CONTACT_PHONE || '+91 88240 44647',
+};
+
 export const defaultSiteConfig: SiteConfigResponse = {
-  profile: {
-    name: 'Chess Academy',
-    fullName: 'Chess Academy International',
-    tagline: 'Building champions, one move at a time',
-    description: 'Premium online chess coaching for young minds.',
-    email: process.env.PUBLIC_CONTACT_EMAIL || 'hello@emberkids.com',
-    phone: process.env.PUBLIC_CONTACT_PHONE || '+91 88240 44647',
-    phoneHref: process.env.PUBLIC_CONTACT_PHONE_HREF || 'tel:+918824044647',
-    whatsappHref: process.env.PUBLIC_WHATSAPP_URL || 'https://wa.me/918824044647',
-    supportLine: process.env.PUBLIC_CONTACT_PHONE || '+91 88240 44647',
-  },
+  profile: defaultSiteProfile,
   navigation: [
     { name: "Home", href: "/" },
     { name: "Academy", href: "/about" },
@@ -183,5 +231,5 @@ export const defaultSiteConfig: SiteConfigResponse = {
   ],
   primaryCta: { label: 'Book a Free Trial' },
   secondaryCta: { label: 'View Courses', href: '/courses' },
-  socialLinks: [],
+  socialLinks: buildDefaultSocialLinks(defaultSiteProfile),
 };

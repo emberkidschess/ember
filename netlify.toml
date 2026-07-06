@@ -6,5 +6,11 @@
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
-  NEXT_PUBLIC_API_URL = "https://ember-btx5.onrender.com/api"
+  NEXT_PUBLIC_API_URL = "/api"
   INTERNAL_PORTAL_ENTRY_PATH = "/secure-entry-x7k9p3m2q8"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://ember-btx5.onrender.com/api/:splat"
+  status = 200
+  force = true

@@ -10,10 +10,11 @@ import Modal from "@/components/admin/Modal";
 import { FormField, inputClass, selectClass, textareaClass, primaryButtonClass, secondaryButtonClass, dangerButtonClass } from "@/components/admin/FormField";
 import { getLeads, createLead, updateLead, deleteLead, type Lead } from "@/lib/adminApi";
 import { COUNTRY_OPTIONS, formatPhoneInput, type SupportedCountry } from "@/lib/phone";
+import { formatLeadCategory, toTitleLabel } from "@/lib/labels";
 
 const LEAD_STATUSES = ["new", "contacted", "qualified", "converted", "lost"];
-const LEAD_SOURCES = ["website", "referral", "social_media", "advertisement", "other"];
-const LEAD_CATEGORIES = ["beginner", "intermediate", "advanced", "master"];
+const LEAD_SOURCES = ["website", "referral", "social_media", "advertisement", "event", "word_of_mouth", "other"];
+const LEAD_CATEGORIES = ["beginner", "intermediate", "advanced", "competitive", "hobbyist"];
 
 type LeadFormState = {
   studentName: string;
@@ -240,8 +241,8 @@ export default function LeadsPage() {
                       {lead.phoneNumber}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">{lead.courseInterest}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">{lead.leadSource}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">{toTitleLabel(lead.courseInterest)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">{toTitleLabel(lead.leadSource)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={lead.status} />
                   </td>
@@ -332,7 +333,7 @@ export default function LeadsPage() {
             >
               {LEAD_SOURCES.map((source) => (
                 <option key={source} value={source}>
-                  {source.replace("_", " ").toUpperCase()}
+                  {toTitleLabel(source)}
                 </option>
               ))}
             </select>
@@ -345,7 +346,7 @@ export default function LeadsPage() {
             >
               {LEAD_CATEGORIES.map((category) => (
                 <option key={category} value={category}>
-                  {category.toUpperCase()}
+                  {formatLeadCategory(category)}
                 </option>
               ))}
             </select>

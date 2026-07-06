@@ -13,9 +13,11 @@ export const getTestimonials = async (
     const skip = Math.max(Number(req.query.skip) || 0, 0);
 
     const testimonials = await Testimonial.find({ isActive: true })
+      .select('quote name role location imageUrl videoUrl videoPosterUrl instagramUrl')
       .sort({ order: 1 })
       .limit(limit)
-      .skip(skip);
+      .skip(skip)
+      .lean();
 
     const response: TestimonialsResponse = {
       testimonials:
@@ -33,6 +35,7 @@ export const getTestimonials = async (
           : defaultTestimonials,
     };
 
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json({
       success: true,
       data: response,

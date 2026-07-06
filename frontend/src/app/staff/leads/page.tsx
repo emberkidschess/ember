@@ -5,6 +5,7 @@ import { Loader2, Search, Mail, Phone } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { getLeads, type Lead } from "@/lib/adminApi";
+import { toTitleLabel } from "@/lib/labels";
 
 export default function StaffLeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -99,7 +100,7 @@ export default function StaffLeadsPage() {
                     {lead.phoneNumber}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-500">{lead.courseInterest}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-500">{toTitleLabel(lead.courseInterest)}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <StatusBadge status={lead.status} />
                 </td>

@@ -484,6 +484,17 @@ export const provisionStudentAccess = async (req: AuthRequest, res: Response) =>
       await Student.findByIdAndUpdate(id, { $inc: { sessionVersion: 1 } });
       await ClientAuthService.revokeAllTokens(existingAuth._id.toString());
       await invalidateStudentCaches(id);
+      try {
+        const emailService = (await import('../services/emailService')).default;
+        await emailService.sendTemplatedEmail(student.email, 'student_credentials_updated', {
+          parentName: student.parentName,
+          studentName: student.studentName,
+          email: existingAuth.email,
+          tempPassword: password,
+        });
+      } catch (emailError) {
+        console.error('Failed to send updated student credentials email:', emailError);
+      }
       return res.json({
         success: true,
         message: 'Student portal credentials updated successfully.',
@@ -499,6 +510,18 @@ export const provisionStudentAccess = async (req: AuthRequest, res: Response) =>
     });
 
     await invalidateStudentCaches(id);
+
+    try {
+      const emailService = (await import('../services/emailService')).default;
+      await emailService.sendTemplatedEmail(student.email, 'credentials_created', {
+        parentName: student.parentName,
+        studentName: student.studentName,
+        email: newAuth.email,
+        tempPassword: password,
+      });
+    } catch (emailError) {
+      console.error('Failed to send student credentials email:', emailError);
+    }
 
     res.json({
       success: true,

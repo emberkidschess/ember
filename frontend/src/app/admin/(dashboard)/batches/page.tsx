@@ -40,6 +40,7 @@ import {
   COURSE_SESSION_TOTALS,
   type CourseLevel,
 } from "@/lib/courseEnrollment";
+import { formatCourseLevel } from "@/lib/labels";
 import Link from "next/link";
 
 const BATCH_STATUSES = ["upcoming", "ongoing", "completed"] as const;
@@ -340,7 +341,7 @@ export default function BatchesPage() {
                       <p className="font-medium text-[var(--color-walnut)]">{batch.name}</p>
                       {batch.schedule && <p className="text-xs text-[var(--color-muted)] mt-0.5">{batch.schedule}</p>}
                     </td>
-                    <td className="px-5 py-3.5 text-[var(--color-walnut)]">{batch.courseLevel}</td>
+                    <td className="px-5 py-3.5 text-[var(--color-walnut)]">{formatCourseLevel(batch.courseLevel)}</td>
                     <td className="px-5 py-3.5 text-[var(--color-walnut)]">
                       {typeof batch.coach === "object" ? batch.coach.name : "—"}
                     </td>

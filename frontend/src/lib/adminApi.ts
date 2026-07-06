@@ -241,6 +241,18 @@ export interface PaymentLink {
   createdAt: string;
 }
 
+export interface PaymentLinkDeliveryFailure {
+  channel: "email" | "whatsapp" | "copy_link";
+  error: string;
+}
+
+export interface PaymentLinkShareResponse extends ApiItemResponse<PaymentLink> {
+  deliveryResults?: {
+    deliveredChannels: ("email" | "whatsapp" | "copy_link")[];
+    failedDeliveries: PaymentLinkDeliveryFailure[];
+  };
+}
+
 export const getPaymentLinks = (params?: { student?: string; status?: string; purpose?: string }) => {
   const query = params ? `?${new URLSearchParams(params).toString()}` : "";
   return adminFetchJSON<ApiListResponse<PaymentLink>>(`/payment-links${query}`);
@@ -252,7 +264,7 @@ export const createPaymentLink = (payload: Record<string, unknown>) =>
     body: JSON.stringify(payload),
   });
 export const sendPaymentLink = (id: string, channels: ("email" | "whatsapp" | "copy_link")[]) =>
-  adminFetchJSON<ApiItemResponse<PaymentLink>>(`/payment-links/${id}/send`, {
+  adminFetchJSON<PaymentLinkShareResponse>(`/payment-links/${id}/send`, {
     method: "POST",
     body: JSON.stringify({ channels }),
   });

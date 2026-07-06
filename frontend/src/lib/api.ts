@@ -80,7 +80,7 @@ export async function fetchAPI<T>(
 export const getSiteConfig = () => fetchAPI<ApiResponse<SiteConfigResponse>>("/site/config");
 
 // Testimonials
-export const getTestimonials = () => fetchAPI<ApiResponse<TestimonialsResponse>>("/testimonials");
+export const getTestimonials = (limit = 6) => fetchAPI<ApiResponse<TestimonialsResponse>>(`/testimonials?limit=${limit}`);
 
 // Prodigies
 export const getProdigies = () => fetchAPI<ApiResponse<ProdigiesResponse>>("/prodigies");

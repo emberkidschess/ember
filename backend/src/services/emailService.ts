@@ -14,6 +14,9 @@ type EmailTemplate =
   | 'package_activated'
   | 'package_near_completion'
   | 'credentials_created'
+  | 'student_credentials_updated'
+  | 'staff_credentials_created'
+  | 'staff_password_reset'
   | 'help_request'
   | string;
 
@@ -276,6 +279,42 @@ class EmailService {
             <li><strong>Password:</strong> ${data.tempPassword}</li>
           </ul>
           <p>Please log in and change your password immediately.</p>
+        `),
+      },
+      student_credentials_updated: {
+        subject: `Your Student Portal Login Was Updated`,
+        html: base(`
+          <p>Dear ${data.parentName},</p>
+          <p>The student portal login for <strong>${data.studentName}</strong> has been updated by the academy team.</p>
+          <ul>
+            <li><strong>Email:</strong> ${data.email}</li>
+            <li><strong>Temporary password:</strong> ${data.tempPassword}</li>
+          </ul>
+          <p>Please log in with the new password and change it immediately. If you did not request this change, contact the academy team right away.</p>
+        `),
+      },
+      staff_credentials_created: {
+        subject: `Your EmberKids Staff Portal Access`,
+        html: base(`
+          <p>Dear ${data.name},</p>
+          <p>Your <strong>EmberKids ${data.roleLabel}</strong> portal access has been created.</p>
+          <ul>
+            <li><strong>Login email:</strong> ${data.email}</li>
+            <li><strong>Temporary password:</strong> ${data.tempPassword}</li>
+          </ul>
+          <p>Please sign in from the staff portal and change your password immediately. Keep these credentials private.</p>
+        `),
+      },
+      staff_password_reset: {
+        subject: `Your EmberKids Staff Password Was Reset`,
+        html: base(`
+          <p>Dear ${data.name},</p>
+          <p>Your staff portal password was reset by an administrator.</p>
+          <ul>
+            <li><strong>Login email:</strong> ${data.email}</li>
+            <li><strong>Temporary password:</strong> ${data.tempPassword}</li>
+          </ul>
+          <p>Please sign in and change this password immediately. If this was unexpected, contact an administrator before using the account.</p>
         `),
       },
       help_request: {

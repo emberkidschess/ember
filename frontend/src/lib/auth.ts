@@ -40,6 +40,8 @@ const STORAGE_KEYS = {
   legacyUser: "ches_user",
 } as const;
 
+const memoryUsers: Partial<Record<"admin" | "staff", AuthUser>> = {};
+
 function requireApiUrl(): string {
   if (!API_URL) {
     throw new Error("NEXT_PUBLIC_API_URL environment variable is not set");
@@ -58,14 +60,45 @@ function storageKey(portal: "admin" | "staff") {
   return STORAGE_KEYS[portal];
 }
 
+function storageGet(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function storageSet(key: string, value: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Safari private browsing can reject localStorage writes. Cookies still
+    // carry the real session; memory keeps this tab usable.
+  }
+}
+
+function storageRemove(key: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Ignore storage access failures.
+  }
+}
+
 function storeUser(portal: "admin" | "staff", user: AuthUser): void {
-  localStorage.setItem(storageKey(portal), JSON.stringify({ ...user, authType: portal }));
-  localStorage.removeItem(STORAGE_KEYS.legacyUser);
+  const scopedUser = { ...user, authType: portal };
+  memoryUsers[portal] = scopedUser;
+  storageSet(storageKey(portal), JSON.stringify(scopedUser));
+  storageRemove(STORAGE_KEYS.legacyUser);
 }
 
 function clearUser(portal: "admin" | "staff"): void {
-  localStorage.removeItem(storageKey(portal));
-  localStorage.removeItem(STORAGE_KEYS.legacyUser);
+  delete memoryUsers[portal];
+  storageRemove(storageKey(portal));
+  storageRemove(STORAGE_KEYS.legacyUser);
 }
 
 function parseStoredUser(value: string | null, portal: "admin" | "staff"): AuthUser | null {
@@ -74,7 +107,7 @@ function parseStoredUser(value: string | null, portal: "admin" | "staff"): AuthU
     const user = JSON.parse(value) as AuthUser;
     return user.authType === portal ? user : null;
   } catch {
-    localStorage.removeItem(storageKey(portal));
+    storageRemove(storageKey(portal));
     return null;
   }
 }
@@ -125,11 +158,6 @@ export async function logout(portal: "admin" | "staff" = getPortal()): Promise<v
 }
 
 export async function refreshAccessToken(portal: "admin" | "staff" = getPortal()): Promise<boolean> {
-  // Don't attempt refresh if there's no user in localStorage
-  if (!getCurrentUser(portal)) {
-    return false;
-  }
-
   try {
     const response = await fetch(`${requireApiUrl()}/auth/${portal}/refresh`, {
       method: "POST",
@@ -161,7 +189,7 @@ export async function refreshAccessToken(portal: "admin" | "staff" = getPortal()
 
 export function getCurrentUser(portal: "admin" | "staff" = getPortal()): AuthUser | null {
   if (typeof window === "undefined") return null;
-  return parseStoredUser(localStorage.getItem(storageKey(portal)), portal);
+  return parseStoredUser(storageGet(storageKey(portal)), portal) || memoryUsers[portal] || null;
 }
 
 export function getAnyCurrentUser(): AuthUser | null {
@@ -191,8 +219,6 @@ export function hasAnyPermission(...permissions: string[]): boolean {
 }
 
 export async function verifySession(portal: "admin" | "staff" = getPortal()): Promise<AuthUser | null> {
-  if (!getCurrentUser(portal)) return null;
-
   let response = await fetch(`${requireApiUrl()}/auth/${portal}/session`, {
     headers: { "X-Auth-Portal": portal },
     credentials: "include",
@@ -257,6 +283,7 @@ export async function adminFetch(
 
 // Simple in-memory cache for GET requests
 const cache = new Map<string, { data: unknown; timestamp: number }>();
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
 const CACHE_TTL = 30000; // 30 seconds
 
 export async function adminFetchWithCache<T = unknown>(
@@ -301,6 +328,23 @@ export async function adminFetchJSON<T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const method = (options.method || "GET").toUpperCase();
+  const isGet = method === "GET";
+  const cacheKey = `${endpoint}-${JSON.stringify(options.headers || {})}`;
+
+  if (isGet) {
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data as T;
+    }
+
+    const pending = inFlightGetRequests.get(cacheKey);
+    if (pending) return pending as Promise<T>;
+  } else {
+    clearAdminCache();
+  }
+
+  const request = (async () => {
   try {
     const response = await adminFetch(endpoint, options);
 
@@ -316,7 +360,11 @@ export async function adminFetchJSON<T = unknown>(
     // API endpoints use a consistent { success, data?, error? } envelope.
     // Return error envelopes to callers too so forms can display the server's
     // precise validation/business message instead of a generic network error.
-    return JSON.parse(text) as T;
+    const data = JSON.parse(text) as T;
+    if (isGet && response.ok) {
+      cache.set(cacheKey, { data, timestamp: Date.now() });
+    }
+    return data;
   } catch (error) {
     if (error instanceof TypeError && error.message.includes('fetch')) {
       const networkError: ApiError = {
@@ -327,5 +375,11 @@ export async function adminFetchJSON<T = unknown>(
       throw networkError;
     }
     throw error;
+  } finally {
+    if (isGet) inFlightGetRequests.delete(cacheKey);
   }
+  })();
+
+  if (isGet) inFlightGetRequests.set(cacheKey, request);
+  return request;
 }

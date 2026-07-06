@@ -25,8 +25,8 @@ function cookieOptions(maxAge: number): CookieOptions {
   
   return {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : sameSite,
+    secure: isProduction || sameSite === 'none',
+    sameSite,
     maxAge,
     path: '/',
   };

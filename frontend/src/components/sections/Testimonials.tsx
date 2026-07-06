@@ -11,6 +11,9 @@ import TestimonialCard from "../shared/TestimonialCard";
 import InstagramVideoCard from "../shared/InstagramVideoCard";
 import VideoCard from "../shared/VideoCard";
 import { useTestimonials } from "@/lib/api";
+import { useSiteConfig } from "@/lib/site";
+import { CANONICAL_INSTAGRAM_URL, getSocialHref } from "@/lib/socialLinks";
+import { DEFAULT_TESTIMONIALS } from "@/lib/defaultTestimonials";
 
 function TestimonialSkeleton() {
   return (
@@ -49,9 +52,11 @@ function ErrorMessage({ message }: { message: string }) {
 
 export default function Testimonials() {
   const { data, isLoading, error } = useTestimonials();
+  const { siteConfig } = useSiteConfig();
   const scrollContainer = useRef<HTMLDivElement>(null);
+  const instagramHref = getSocialHref(siteConfig?.socialLinks, "instagram", CANONICAL_INSTAGRAM_URL);
 
-  const testimonialsArray = data?.testimonials || [];
+  const testimonialsArray = data?.testimonials?.length ? data.testimonials : DEFAULT_TESTIMONIALS;
   const displayTestimonials = testimonialsArray.slice(0, 6);
   const hasData = displayTestimonials.length > 0;
 
@@ -99,13 +104,13 @@ export default function Testimonials() {
           viewport={viewportConfig}
           className="relative group min-h-[420px]"
         >
-          {isLoading ? (
+          {isLoading && !hasData ? (
             <div className="flex flex-nowrap gap-4 overflow-x-hidden snap-x snap-mandatory py-4">
               {Array.from({ length: 3 }).map((_, i) => (
                 <TestimonialSkeleton key={`skeleton-${i}`} />
               ))}
             </div>
-          ) : error ? (
+          ) : error && !hasData ? (
             <ErrorMessage message="Unable to load testimonials." />
           ) : !hasData ? (
             <ErrorMessage message="No testimonials available." />
@@ -218,7 +223,7 @@ export default function Testimonials() {
           {/* View More on Instagram Button */}
           <div className="flex justify-center mt-8">
             <a
-              href="https://www.instagram.com/emberkidsofficial?igsh=N29kNjloamYzeGpr&utm_source=qr"
+              href={instagramHref}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-6 py-3 bg-white border-2 border-[var(--color-line)]/30 text-[var(--color-walnut)] rounded-full text-sm font-semibold hover:border-[var(--color-ember)] hover:text-[var(--color-ember)] hover:shadow-md transition-all duration-300 group"

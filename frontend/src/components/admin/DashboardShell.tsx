@@ -95,23 +95,6 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
       setChecking(true);
       const currentUser = getCurrentUser(portal);
 
-      if (!currentUser) {
-        setUser(null);
-        router.replace("/login");
-        return;
-      }
-
-      if (portal === "admin" && currentUser.authType !== "admin") {
-        setUser(null);
-        router.replace("/login");
-        return;
-      }
-      if (portal === "staff" && currentUser.authType !== "staff") {
-        setUser(null);
-        router.replace("/login");
-        return;
-      }
-
       try {
         const freshUser = await verifySession(portal);
         if (cancelled) return;
