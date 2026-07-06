@@ -20,13 +20,22 @@ class ApiRequestError extends Error {
 async function fetchWithRetry<T>(
   url: string,
   options: RequestInit = {},
-  retries = 3,
-  delay = 1000
+  retries = 1,
+  delay = 500
 ): Promise<T> {
   let lastError: unknown;
   for (let i = 0; i < retries; i++) {
     try {
-      const response = await fetch(url, options);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
       const data = await response.json().catch(() => null);
       if (response.ok) {
         return data as T;
@@ -36,16 +45,12 @@ async function fetchWithRetry<T>(
         data && typeof data === "object" && "error" in data
           ? String(data.error)
           : `API error: ${response.status} ${response.statusText}`;
-      if (response.status < 500 || i === retries - 1) {
-        throw new ApiRequestError(message, false);
-      }
-      lastError = new ApiRequestError(message, true);
+      throw new ApiRequestError(message, false);
     } catch (error) {
       lastError = error;
-      if (error instanceof ApiRequestError && !error.retryable) throw error;
       if (i === retries - 1) throw error;
     }
-    await new Promise((resolve) => setTimeout(resolve, delay * (i + 1)));
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
   throw lastError instanceof Error ? lastError : new Error("Request failed");
 }

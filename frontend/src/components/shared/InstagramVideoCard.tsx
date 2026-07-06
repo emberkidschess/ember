@@ -8,10 +8,6 @@ interface InstagramVideoCardProps {
   className?: string;
 }
 
-// Singleton pattern to prevent duplicate script loading
-let instagramScriptLoaded = false;
-let instagramScriptError = false;
-
 export default function InstagramVideoCard({ item, className = "" }: InstagramVideoCardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -31,91 +27,67 @@ export default function InstagramVideoCard({ item, className = "" }: InstagramVi
     ? `https://www.instagram.com/${isReel ? 'reel' : 'p'}/${instagramId}/embed`
     : null;
 
-  // Load Instagram embed script immediately on mount
+  // Load Instagram embed script with timeout
   useEffect(() => {
-    if (instagramScriptLoaded) {
-      setIsLoading(false);
-      setHasError(instagramScriptError);
-      // Re-process embeds if script is already loaded
-      if (typeof window !== 'undefined' && (window as any).instgrm) {
-        (window as any).instgrm.Embeds.process();
+    const loadScript = () => {
+      if (typeof window === 'undefined' || document.querySelector('script[src="https://www.instagram.com/embed.js"]')) {
+        setIsLoading(false);
+        return;
       }
-      return;
-    }
 
-    const existingScript = document.querySelector('script[src="https://www.instagram.com/embed.js"]');
-    if (existingScript) {
-      instagramScriptLoaded = true;
-      setIsLoading(false);
-      // Process embeds
-      if (typeof window !== 'undefined' && (window as any).instgrm) {
-        (window as any).instgrm.Embeds.process();
-      }
-      return;
-    }
+      const script = document.createElement('script');
+      script.src = 'https://www.instagram.com/embed.js';
+      script.async = true;
+      
+      const timeout = setTimeout(() => {
+        setHasError(true);
+        setIsLoading(false);
+      }, 8000); // 8 second timeout for Instagram script
 
-    const script = document.createElement('script');
-    script.src = 'https://www.instagram.com/embed.js';
-    script.async = true;
-    script.onload = () => {
-      instagramScriptLoaded = true;
-      setIsLoading(false);
-      // Process embeds after script loads
-      if (typeof window !== 'undefined' && (window as any).instgrm) {
-        (window as any).instgrm.Embeds.process();
-      }
-    };
-    script.onerror = () => {
-      instagramScriptLoaded = true;
-      instagramScriptError = true;
-      setHasError(true);
-      setIsLoading(false);
-    };
-    document.body.appendChild(script);
-  }, []);
-
-  // Force Instagram iframe to fit container
-  useEffect(() => {
-    if (!isLoading && typeof window !== 'undefined' && (window as any).instgrm) {
-      const observer = new MutationObserver(() => {
-        const iframe = cardRef.current?.querySelector('iframe');
-        if (iframe) {
-          iframe.style.width = '100%';
-          iframe.style.height = '100%';
-          iframe.style.position = 'absolute';
-          iframe.style.top = '0';
-          iframe.style.left = '0';
-          iframe.style.border = 'none';
-          iframe.style.maxWidth = '100%';
-          iframe.style.maxHeight = '100%';
+      script.onload = () => {
+        clearTimeout(timeout);
+        setIsLoading(false);
+        if (typeof window !== 'undefined' && (window as any).instgrm) {
+          (window as any).instgrm.Embeds.process();
         }
-      });
+      };
+      
+      script.onerror = () => {
+        clearTimeout(timeout);
+        setHasError(true);
+        setIsLoading(false);
+      };
+      
+      document.body.appendChild(script);
+    };
 
-      const iframe = cardRef.current?.querySelector('iframe');
-      if (iframe) {
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.position = 'absolute';
-        iframe.style.top = '0';
-        iframe.style.left = '0';
-        iframe.style.border = 'none';
-        iframe.style.maxWidth = '100%';
-        iframe.style.maxHeight = '100%';
-      }
-
-      if (cardRef.current) {
-        observer.observe(cardRef.current, { childList: true, subtree: true });
-      }
-
-      return () => observer.disconnect();
-    }
-  }, [isLoading]);
+    loadScript();
+  }, []);
 
   if (!embedUrl) {
     return (
       <div className={`relative h-full min-h-[420px] rounded-2xl overflow-hidden bg-gray-800 ${className}`} role="alert" aria-live="polite">
         <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
           <p className="text-white/60">Invalid Instagram URL</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className={`relative h-full min-h-[420px] rounded-2xl overflow-hidden bg-gray-800 ${className}`} role="alert" aria-live="assertive">
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+          <p className="text-white/60 mb-4">Unable to load Instagram video</p>
+          <a
+            href={item.instagramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[var(--color-ember)] hover:text-white transition-colors text-sm"
+            aria-label={`View ${item.name}'s testimonial on Instagram`}
+          >
+            View on Instagram
+          </a>
         </div>
       </div>
     );
@@ -128,8 +100,8 @@ export default function InstagramVideoCard({ item, className = "" }: InstagramVi
       role="article"
       aria-label={`Instagram testimonial from ${item.name}`}
     >
-      {/* Poster/Loading State */}
-      {isLoading && !hasError && (
+      {/* Loading State */}
+      {isLoading && (
         <div className="absolute inset-0 z-10 bg-gray-800">
           <img
             src="https://res.cloudinary.com/aaa97ofg/image/upload/v1783288892/chess-academy/hero.png"
@@ -137,7 +109,6 @@ export default function InstagramVideoCard({ item, className = "" }: InstagramVi
             aria-hidden="true"
             className="w-full h-full object-cover"
           />
-          {/* Dark Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/75 to-black/40 mix-blend-multiply" />
           <div className="absolute inset-0 bg-gradient-to-tr from-[var(--color-walnut)]/40 via-transparent to-[var(--color-ember)]/10 opacity-60" />
           
@@ -176,24 +147,8 @@ export default function InstagramVideoCard({ item, className = "" }: InstagramVi
         </div>
       )}
 
-      {/* Error State */}
-      {hasError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 z-20 p-6" role="alert" aria-live="assertive">
-          <p className="text-white/60 text-center mb-4">Unable to load Instagram video</p>
-          <a
-            href={item.instagramUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[var(--color-ember)] hover:text-white transition-colors text-sm"
-            aria-label={`View ${item.name}'s testimonial on Instagram`}
-          >
-            View on Instagram
-          </a>
-        </div>
-      )}
-
-      {/* Instagram Embed - Full Screen */}
-      {!isLoading && !hasError && (
+      {/* Instagram Embed */}
+      {!isLoading && (
         <div className="absolute inset-0 z-20 bg-white overflow-hidden" aria-hidden="true">
           <blockquote
             className="instagram-media"
