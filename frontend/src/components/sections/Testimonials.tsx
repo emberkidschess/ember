@@ -193,7 +193,7 @@ export default function Testimonials() {
                 </div>
               </div>
               <div>
-                <p className="text-sm font-semibold text-[var(--color-walnut)] tracking-tight">500+ Happy Families</p>
+                <p className="text-sm font-semibold text-[var(--color-walnut)] tracking-tight">5000+ Happy Families</p>
                 <p className="text-xs text-[var(--color-muted)]">Across 20+ countries</p>
               </div>
             </div>
