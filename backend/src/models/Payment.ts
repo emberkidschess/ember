@@ -113,7 +113,10 @@ const PaymentSchema: Schema = new Schema(
 );
 
 PaymentSchema.index({ student: 1, status: 1 });
+PaymentSchema.index({ lead: 1, status: 1 });
 PaymentSchema.index({ status: 1, createdAt: -1 });
+PaymentSchema.index({ status: 1, currency: 1, createdAt: -1 });
+PaymentSchema.index({ createdBy: 1, createdAt: -1 });
 PaymentSchema.index({ paymentLink: 1 }, { unique: true, sparse: true });
 
 const Payment: Model<IPayment> = mongoose.models.Payment || mongoose.model<IPayment>('Payment', PaymentSchema);

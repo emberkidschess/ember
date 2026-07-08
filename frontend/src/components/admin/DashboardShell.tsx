@@ -206,11 +206,11 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
   }
 
   return (
-    <div className="min-h-screen flex bg-[var(--color-ivory)]">
+    <div className="min-h-screen flex bg-[var(--color-ivory)] text-[var(--color-walnut)]">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/45 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
@@ -218,9 +218,8 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 h-screen w-[260px] bg-[var(--color-walnut)] text-[var(--color-paper)] flex flex-col z-50 transition-transform lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed lg:sticky top-0 left-0 h-screen w-[260px] bg-[var(--color-walnut)] text-[var(--color-paper)] flex flex-col z-50 transition-transform lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="flex items-center justify-between px-6 h-16 border-b border-white/10 shrink-0">
           <Link href={`/${portal}/dashboard`} className="font-[family-name:var(--font-playfair)] font-bold text-lg">
@@ -250,11 +249,10 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
                       key={item.href}
                       href={item.href}
                       onClick={() => setSidebarOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                        active
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${active
                           ? "bg-[var(--color-ember)] text-white"
                           : "text-white/70 hover:bg-white/5 hover:text-white"
-                      }`}
+                        }`}
                     >
                       <Icon className="h-[18px] w-[18px] shrink-0" />
                       {item.label}

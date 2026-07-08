@@ -18,4 +18,7 @@ const CourseSchema = new Schema(
   }
 );
 
+CourseSchema.index({ order: 1 });
+CourseSchema.index({ isPremium: 1, order: 1 });
+
 export const Course = mongoose.model<CourseDocument>('Course', CourseSchema);

@@ -31,6 +31,7 @@ import {
   assertPackageCanRenew,
   assertPackageCanUpgrade,
 } from '../services/enrollmentLifecycleService';
+import { sanitizePaginationParams, sanitizeQueryParam } from '../utils/validation';
 
 type PaymentLinkShareChannel = 'email' | 'whatsapp' | 'copy_link';
 type PaymentLinkDeliveryFailure = { channel: PaymentLinkShareChannel; error: string };
@@ -189,25 +190,43 @@ export const getPaymentLinkPublic = async (req: Request, res: Response) => {
 export const getPaymentLinks = async (req: AuthRequest, res: Response) => {
   try {
     await expireActivePaymentLinks();
-    const { student, status, purpose } = req.query;
+    const { student, status, purpose, page = '1', limit = '100' } = req.query;
 
     const filter: any = {};
 
-    if (student) filter.student = student;
-    if (status) filter.status = status;
-    if (purpose) filter.purpose = purpose;
+    const sanitizedStudent = sanitizeQueryParam(student);
+    const sanitizedStatus = sanitizeQueryParam(status);
+    const sanitizedPurpose = sanitizeQueryParam(purpose);
+    if (sanitizedStudent) filter.student = sanitizedStudent;
+    if (sanitizedStatus) filter.status = sanitizedStatus;
+    if (sanitizedPurpose) filter.purpose = sanitizedPurpose;
 
-    const paymentLinks = await PaymentLink.find(filter)
-      .populate('student', 'studentName parentName email phoneNumber')
-      .populate('lead', 'studentName parentName email phoneNumber')
-      .populate('previousPackageId', 'packageType courseLevel')
-      .populate('createdBy', 'name email')
-      .select('student lead amount currency status purpose packageType courseLevel previousPackageId paymentMethod shareableUrl sentVia sentAt paidAt activatedAt createdAt')
-      .sort({ createdAt: -1 });
+    const { page: pageNum, limit: limitNum } = sanitizePaginationParams(page, limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [paymentLinks, total] = await Promise.all([
+      PaymentLink.find(filter)
+        .populate('student', 'studentName parentName email phoneNumber')
+        .populate('lead', 'studentName parentName email phoneNumber')
+        .populate('previousPackageId', 'packageType courseLevel')
+        .populate('createdBy', 'name email')
+        .select('student lead amount currency status purpose packageType courseLevel previousPackageId paymentMethod shareableUrl sentVia sentAt paidAt activatedAt createdAt')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      PaymentLink.countDocuments(filter),
+    ]);
 
     res.json({
       success: true,
       data: paymentLinks,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error) {
     console.error('Error fetching payment links:', error);
@@ -229,7 +248,9 @@ export const getPendingActivations = async (req: AuthRequest, res: Response) => 
       .populate('previousPackageId', 'packageType courseLevel')
       .populate('createdBy', 'name email')
       .select('student lead amount currency status purpose packageType courseLevel previousPackageId paymentMethod shareableUrl sentVia sentAt paidAt activatedAt createdAt')
-      .sort({ paidAt: -1 });
+      .sort({ paidAt: -1 })
+      .limit(50)
+      .lean();
 
     res.json({
       success: true,
@@ -251,7 +272,8 @@ export const getPaymentLinkById = async (req: AuthRequest, res: Response) => {
       .populate('student', 'studentName parentName email phoneNumber')
       .populate('lead', 'studentName parentName email phoneNumber')
       .populate('previousPackageId', 'packageType courseLevel')
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .lean();
 
     if (!paymentLink) {
       return res.status(404).json({

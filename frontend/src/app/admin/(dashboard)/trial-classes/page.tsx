@@ -197,25 +197,26 @@ export default function TrialClassesPage() {
   };
 
   const getResultBadge = (result: string) => {
+    const badgeBase = "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold";
     switch (result) {
       case 'recommended':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700"><CheckCircle className="h-3 w-3" /> Recommended</span>;
+        return <span className={`${badgeBase} border-[rgba(63,107,92,0.22)] bg-[var(--color-pine)]/10 text-[var(--color-pine-deep)]`}><CheckCircle className="h-3 w-3" /> Recommended</span>;
       case 'not_recommended':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700"><XCircle className="h-3 w-3" /> Not Recommended</span>;
+        return <span className={`${badgeBase} border-[rgba(199,93,60,0.22)] bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)]`}><XCircle className="h-3 w-3" /> Not Recommended</span>;
       case 'needs_follow_up':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700"><Clock className="h-3 w-3" /> Follow-up</span>;
+        return <span className={`${badgeBase} border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]`}><Clock className="h-3 w-3" /> Follow-up</span>;
       case 'reschedule_requested':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700"><RotateCcw className="h-3 w-3" /> Reschedule</span>;
+        return <span className={`${badgeBase} border-[rgba(31,27,22,0.16)] bg-[var(--color-walnut)]/10 text-[var(--color-walnut)]`}><RotateCcw className="h-3 w-3" /> Reschedule</span>;
       case 'expired':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700"><XCircle className="h-3 w-3" /> Expired</span>;
+        return <span className={`${badgeBase} border-[rgba(199,93,60,0.22)] bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)]`}><XCircle className="h-3 w-3" /> Expired</span>;
       default:
-        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700"><Clock className="h-3 w-3" /> Pending</span>;
+        return <span className={`${badgeBase} border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]`}><Clock className="h-3 w-3" /> Pending</span>;
     }
   };
 
   const getAttendanceBadge = (status?: TrialClass["trialAttendanceStatus"]) => {
-    if (status === "attended") return <span className="text-xs font-medium text-green-700">Attended</span>;
-    if (status === "no_show") return <span className="text-xs font-medium text-red-700">No-show</span>;
+    if (status === "attended") return <span className="text-xs font-bold text-[var(--color-pine-deep)]">Attended</span>;
+    if (status === "no_show") return <span className="text-xs font-bold text-[var(--color-ember-deep)]">No-show</span>;
     return <span className="text-xs text-[var(--color-muted)]">Not marked</span>;
   };
 
@@ -242,28 +243,27 @@ export default function TrialClassesPage() {
 
       {error && <div className="bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)] px-4 py-3 rounded-xl mb-4 text-sm">{error}</div>}
 
-      <div className="bg-[var(--color-paper)] rounded-2xl border border-[var(--color-line)] shadow-[var(--shadow-card)] overflow-hidden">
+      <div className="admin-table-shell">
         {loading ? (
-          <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 text-[var(--color-ember)] animate-spin" /></div>
+          <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" /></div>
         ) : classes.length === 0 ? (
-          <p className="text-center py-16 text-sm text-[var(--color-muted)]">No trial classes scheduled yet.</p>
+          <div className="admin-empty">No trial classes scheduled yet</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--color-line)] text-left text-xs font-bold uppercase tracking-wider text-[var(--color-muted)]">
-                  <th className="px-5 py-3">Student</th>
-                  <th className="px-5 py-3">Coach</th>
-                  <th className="px-5 py-3">Schedule</th>
-                  <th className="px-5 py-3">Meeting Link</th>
-                  <th className="px-5 py-3">Attendance</th>
-                  <th className="px-5 py-3">Result</th>
-                  <th className="px-5 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-line)]">
-                {classes.map((cls) => (
-                  <tr key={cls._id} className="hover:bg-[var(--color-ivory)]/60 transition-colors">
+          <table className="admin-table min-w-full">
+            <thead>
+              <tr>
+                <th className="text-left">Student</th>
+                <th className="text-left">Coach</th>
+                <th className="text-left">Schedule</th>
+                <th className="text-left">Meeting Link</th>
+                <th className="text-left">Attendance</th>
+                <th className="text-left">Result</th>
+                <th className="text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {classes.map((cls) => (
+                <tr key={cls._id}>
                     <td className="px-5 py-3.5">
                       <p className="font-medium text-[var(--color-walnut)]">{cls.leadId?.studentName || 'Unknown'}</p>
                       <p className="text-xs text-[var(--color-muted)]">{cls.leadId?.parentName || ''}</p>
@@ -310,7 +310,6 @@ export default function TrialClassesPage() {
                 ))}
               </tbody>
             </table>
-          </div>
         )}
       </div>
 

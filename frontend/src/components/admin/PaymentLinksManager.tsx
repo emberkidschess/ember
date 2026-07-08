@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus, Loader2, CheckCircle2, Mail, MessageCircle, Link as LinkIcon, Check, DollarSign } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
@@ -79,6 +79,10 @@ function PaymentLinksContent() {
   const [students, setStudents] = useState<Student[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [peopleLoaded, setPeopleLoaded] = useState(false);
+  const [peopleLoading, setPeopleLoading] = useState(false);
+  const [activationDataLoaded, setActivationDataLoaded] = useState(false);
+  const [activationDataLoading, setActivationDataLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -121,36 +125,74 @@ function PaymentLinksContent() {
   const canEnroll = hasPermission("enroll_student");
   const canGenerate = hasPermission("generate_payment_link");
 
-  const loadData = async () => {
+  const loadPaymentLinks = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [linksRes, staffRes, studentsRes, leadsRes, batchesRes] = await Promise.all([
-        getPaymentLinks(),
-        getStaffList("coach"),
-        getStudents(),
-        getLeads(),
-        getBatches(),
-      ]);
+      const linksRes = await getPaymentLinks();
       if (linksRes.success) setLinks(linksRes.data);
       else setError(linksRes.error || "Failed to load payment links");
-      if (staffRes.success) setStaff(staffRes.data);
-      if (studentsRes.success) setStudents(studentsRes.data);
-      if (leadsRes.success) setLeads(leadsRes.data);
-      if (batchesRes.success) setBatches(batchesRes.data);
     } catch {
       setError("Could not connect to the server.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const ensurePeopleData = useCallback(async () => {
+    if (peopleLoaded || peopleLoading) return;
+    setPeopleLoading(true);
+    try {
+      const [studentsRes, leadsRes] = await Promise.all([
+        getStudents({ limit: "100" }),
+        getLeads({ limit: "100" }),
+      ]);
+      if (studentsRes.success) setStudents(studentsRes.data || []);
+      else setCreateError(studentsRes.error || "Failed to load students");
+      if (leadsRes.success) setLeads(leadsRes.data || []);
+      else setCreateError(leadsRes.error || "Failed to load leads");
+      setPeopleLoaded(Boolean(studentsRes.success && leadsRes.success));
+    } catch {
+      setCreateError("Could not load leads and students.");
+    } finally {
+      setPeopleLoading(false);
+    }
+  }, [peopleLoaded, peopleLoading]);
+
+  const ensureActivationData = useCallback(async () => {
+    if (activationDataLoaded || activationDataLoading) return;
+    setActivationDataLoading(true);
+    try {
+      const [staffRes, batchesRes] = await Promise.all([
+        getStaffList("coach"),
+        getBatches({ limit: "100" }),
+      ]);
+      if (staffRes.success) setStaff(staffRes.data || []);
+      else setActivateError(staffRes.error || "Failed to load coaches");
+      if (batchesRes.success) setBatches(batchesRes.data || []);
+      else setActivateError(batchesRes.error || "Failed to load batches");
+      setActivationDataLoaded(Boolean(staffRes.success && batchesRes.success));
+    } catch {
+      setActivateError("Could not load coaches and batches.");
+    } finally {
+      setActivationDataLoading(false);
+    }
+  }, [activationDataLoaded, activationDataLoading]);
 
   // Kick off data load once on mount — calling an async function from the
   // effect body rather than calling setState directly avoids the lint warning.
   useEffect(() => {
-    loadData();
+    loadPaymentLinks();
      
-  }, []);
+  }, [loadPaymentLinks]);
+
+  useEffect(() => {
+    if (createOpen) void ensurePeopleData();
+  }, [createOpen, ensurePeopleData]);
+
+  useEffect(() => {
+    if (activateTarget) void ensureActivationData();
+  }, [activateTarget, ensureActivationData]);
 
   // Derive activateTarget from URL param + loaded links so we don't need
   // a separate useEffect that calls setState synchronously.
@@ -194,7 +236,7 @@ function PaymentLinksContent() {
         setCreateOpen(false);
         setCreatedLink(res.data);
         setCreateForm({ purpose: "new_package", lead: "", student: "", amount: "", currency: "INR", packageType: "10 Sessions", courseLevel: "Beginner", previousPackageId: "", notes: "" });
-        loadData();
+        loadPaymentLinks();
       } else {
         setCreateError(res.error || "Failed to create payment link");
       }
@@ -241,7 +283,7 @@ function PaymentLinksContent() {
         );
         setSendInfo("Payment link copied.");
         void sendPaymentLink(sendTarget._id, [channel]).then((res) => {
-          if (res.success) void loadData();
+          if (res.success) void loadPaymentLinks();
         });
       } else {
         const res = await sendPaymentLink(sendTarget._id, [channel]);
@@ -251,7 +293,7 @@ function PaymentLinksContent() {
           );
           const failed = res.deliveryResults?.failedDeliveries || [];
           setSendInfo(failed.length > 0 ? res.message || "Payment link shared with one warning." : res.message || "Payment link shared successfully.");
-          void loadData();
+          void loadPaymentLinks();
         } else {
           const failure = res.deliveryResults?.failedDeliveries?.find((item) => item.channel === channel);
           setSendError(failure?.error || res.error || "Could not share the payment link.");
@@ -278,7 +320,7 @@ function PaymentLinksContent() {
       const res = await markPaymentReceived(markPaidTarget._id, markPaidReference || undefined);
       if (res.success) {
         closeMarkPaid();
-        void loadData();
+        void loadPaymentLinks();
       } else setMarkPaidError(res.error || "Could not mark this payment as received.");
     } catch (markFailure) {
       setMarkPaidError(
@@ -301,7 +343,7 @@ function PaymentLinksContent() {
       const res = await activatePackage(activateTarget._id, activateForm);
       if (res.success) {
         setActivationSuccess(true);
-        loadData();
+        loadPaymentLinks();
       } else {
         setActivateError(res.error || "Failed to activate package");
       }
@@ -360,7 +402,7 @@ function PaymentLinksContent() {
 
   return (
     <div>
-      <PageHeader
+        <PageHeader
         title="Payment Links"
         description="Create payment links for new enrollments, renewals, and upgrades. Enrolling a paid link creates the student's dashboard login."
         actions={
@@ -374,29 +416,28 @@ function PaymentLinksContent() {
 
       {error && <div className="bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)] px-4 py-3 rounded-xl mb-4 text-sm">{error}</div>}
 
-      <div className="bg-[var(--color-paper)] rounded-2xl border border-[var(--color-line)] shadow-[var(--shadow-card)] overflow-hidden">
+      <div className="admin-table-shell">
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 text-[var(--color-ember)] animate-spin" />
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" />
           </div>
         ) : links.length === 0 ? (
-          <p className="text-center py-16 text-sm text-[var(--color-muted)]">No payment links yet.</p>
+          <div className="admin-empty">No payment links yet</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--color-line)] text-left text-xs font-bold uppercase tracking-wider text-[var(--color-muted)]">
-                  <th className="px-5 py-3">Contact</th>
-                  <th className="px-5 py-3">Package</th>
-                  <th className="px-5 py-3">Amount</th>
-                  <th className="px-5 py-3">Method</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-line)]">
-                {links.map((link) => (
-                  <tr key={link._id} className="hover:bg-[var(--color-ivory)]/60 transition-colors">
+          <table className="admin-table min-w-full">
+            <thead>
+              <tr>
+                <th className="text-left">Contact</th>
+                <th className="text-left">Package</th>
+                <th className="text-left">Amount</th>
+                <th className="text-left">Method</th>
+                <th className="text-left">Status</th>
+                <th className="text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {links.map((link) => (
+                <tr key={link._id}>
                     <td className="px-5 py-3.5 font-medium text-[var(--color-walnut)]">
                       {contactNameOf(link)}
                       <span className="ml-2 text-[10px] font-bold uppercase text-[var(--color-muted)]">
@@ -431,7 +472,6 @@ function PaymentLinksContent() {
                 ))}
               </tbody>
             </table>
-          </div>
         )}
       </div>
 
@@ -453,7 +493,7 @@ function PaymentLinksContent() {
           {createForm.purpose === "new_package" ? (
             <FormField label="Lead" required hint="Only un-converted leads appear here.">
               <select required value={createForm.lead} onChange={(e) => setCreateForm({ ...createForm, lead: e.target.value })} className={selectClass}>
-                <option value="">Select a lead...</option>
+                <option value="">{peopleLoading ? "Loading leads..." : "Select a lead..."}</option>
                 {leads.map((l) => (
                   <option key={l._id} value={l._id}>{l.studentName} ({l.parentName})</option>
                 ))}
@@ -462,7 +502,7 @@ function PaymentLinksContent() {
           ) : (
             <FormField label="Student" required>
               <select required value={createForm.student} onChange={(e) => selectEnrollmentStudent(e.target.value)} className={selectClass}>
-                <option value="">Select a student...</option>
+                <option value="">{peopleLoading ? "Loading students..." : "Select a student..."}</option>
                 {eligibleStudents.map((s) => (
                   <option key={s._id} value={s._id}>{s.studentName} ({s.parentName})</option>
                 ))}
@@ -685,7 +725,7 @@ function PaymentLinksContent() {
                 }}
                 className={selectClass}
               >
-                <option value="">Select a matching batch...</option>
+                <option value="">{activationDataLoading ? "Loading batches..." : "Select a matching batch..."}</option>
                 {availableActivationBatches.map((batch) => (
                   <option key={batch._id} value={batch._id}>
                     {batch.name} · {formatCourseLevel(batch.courseLevel)} · {getBatchCoachName(batch)}
@@ -702,7 +742,7 @@ function PaymentLinksContent() {
                 onChange={(e) => setActivateForm({ ...activateForm, assignedCoach: e.target.value })}
                 className={selectClass}
               >
-                <option value="">Select a coach...</option>
+                <option value="">{activationDataLoading ? "Loading coaches..." : "Select a coach..."}</option>
                 {staff.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
               </select>
             </FormField>

@@ -29,7 +29,7 @@ export default function PageHeader({ title, description, actions }: PageHeaderPr
             type="button"
             onClick={action.onClick}
             disabled={action.disabled}
-            className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-walnut)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--color-walnut)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] bg-[var(--color-walnut)] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-ember-deep)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {Icon && <Icon className="h-4 w-4" />}
             {action.label}
@@ -39,14 +39,17 @@ export default function PageHeader({ title, description, actions }: PageHeaderPr
     : actions;
 
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--color-walnut)] font-[family-name:var(--font-playfair)]">
+    <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--color-line)] pb-5">
+      <div className="max-w-3xl">
+        <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--color-gold)]">
+          Management
+        </p>
+        <h1 className="font-[family-name:var(--font-playfair)] text-2xl font-bold text-[var(--color-walnut)] sm:text-3xl">
           {title}
         </h1>
-        {description && <p className="text-sm text-[var(--color-muted)] mt-1">{description}</p>}
+        {description && <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--color-muted)]">{description}</p>}
       </div>
-      {renderedActions && <div className="flex items-center gap-2.5">{renderedActions}</div>}
+      {renderedActions && <div className="flex flex-wrap items-center gap-2.5">{renderedActions}</div>}
     </div>
   );
 }

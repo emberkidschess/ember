@@ -37,11 +37,25 @@ export interface ActivationResult {
   [key: string]: unknown;
 }
 
+type ListQueryParams = Record<string, string | number | boolean | undefined>;
+
+function toQueryString(params?: ListQueryParams): string {
+  if (!params) return "";
+  const entries = Object.entries(params)
+    .filter((entry): entry is [string, string | number | boolean] => entry[1] !== undefined && entry[1] !== "");
+  return entries.length ? `?${new URLSearchParams(entries.map(([key, value]) => [key, String(value)])).toString()}` : "";
+}
 
 export interface ApiListResponse<T> {
   success: boolean;
   data: T[];
   error?: string;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface ApiItemResponse<T> {
@@ -79,10 +93,8 @@ export interface Lead {
   createdAt: string;
 }
 
-export const getLeads = (params?: { status?: string; source?: string; category?: string }) => {
-  const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : "";
-  return adminFetchJSON<ApiListResponse<Lead>>(`/leads${query}`);
-};
+export const getLeads = (params?: { status?: string; source?: string; category?: string; page?: string | number; limit?: string | number; includeConverted?: boolean }) =>
+  adminFetchJSON<ApiListResponse<Lead>>(`/leads${toQueryString({ limit: 100, ...params })}`);
 export const getLead = (id: string) => adminFetchJSON<ApiItemResponse<Lead>>(`/leads/${id}`);
 export const createLead = (payload: Partial<Lead>) =>
   adminFetchJSON<ApiItemResponse<Lead>>("/leads", { method: "POST", body: JSON.stringify(payload) });
@@ -125,10 +137,8 @@ export interface Student {
   createdAt: string;
 }
 
-export const getStudents = (params?: { status?: string; enrollmentStatus?: string }) => {
-  const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : "";
-  return adminFetchJSON<ApiListResponse<Student>>(`/students${query}`);
-};
+export const getStudents = (params?: { status?: string; enrollmentStatus?: string; page?: string | number; limit?: string | number }) =>
+  adminFetchJSON<ApiListResponse<Student>>(`/students${toQueryString({ limit: 100, ...params })}`);
 export const getStudent = (id: string) => adminFetchJSON<ApiItemResponse<Student>>(`/students/${id}`);
 export const createStudent = (payload: Partial<Student>) =>
   adminFetchJSON<ApiItemResponse<Student>>("/students", { method: "POST", body: JSON.stringify(payload) });
@@ -164,10 +174,8 @@ export interface PackagePayload {
   courseLevel: StudentPackage["courseLevel"];
 }
 
-export const getPackages = (params?: { student?: string; status?: string; courseLevel?: string }) => {
-  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
-  return adminFetchJSON<ApiListResponse<StudentPackage>>(`/packages${query}`);
-};
+export const getPackages = (params?: { student?: string; status?: string; courseLevel?: string; page?: string | number; limit?: string | number }) =>
+  adminFetchJSON<ApiListResponse<StudentPackage>>(`/packages${toQueryString({ limit: 100, ...params })}`);
 export const createPackageRecord = (payload: PackagePayload) =>
   adminFetchJSON<ApiItemResponse<StudentPackage>>("/packages", {
     method: "POST",
@@ -253,10 +261,8 @@ export interface PaymentLinkShareResponse extends ApiItemResponse<PaymentLink> {
   };
 }
 
-export const getPaymentLinks = (params?: { student?: string; status?: string; purpose?: string }) => {
-  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
-  return adminFetchJSON<ApiListResponse<PaymentLink>>(`/payment-links${query}`);
-};
+export const getPaymentLinks = (params?: { student?: string; status?: string; purpose?: string; page?: string | number; limit?: string | number }) =>
+  adminFetchJSON<ApiListResponse<PaymentLink>>(`/payment-links${toQueryString({ limit: 100, ...params })}`);
 export const getPendingActivations = () => adminFetchJSON<ApiListResponse<PaymentLink>>("/payment-links/pending-activations");
 export const createPaymentLink = (payload: Record<string, unknown>) =>
   adminFetchJSON<ApiItemResponse<PaymentLink & { contact?: { name: string; email: string; phone: string } }>>("/payment-links", {
@@ -310,10 +316,8 @@ export interface Batch {
   createdAt: string;
 }
 
-export const getBatches = (params?: { status?: string; courseLevel?: string }) => {
-  const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : "";
-  return adminFetchJSON<ApiListResponse<Batch>>(`/batches${query}`);
-};
+export const getBatches = (params?: { status?: string; courseLevel?: string; page?: string | number; limit?: string | number }) =>
+  adminFetchJSON<ApiListResponse<Batch>>(`/batches${toQueryString({ limit: 100, ...params })}`);
 export const getBatchHistory = () => adminFetchJSON<ApiListResponse<Batch>>("/batches/history");
 export const getBatch = (id: string) => adminFetchJSON<ApiItemResponse<Batch>>(`/batches/${id}`);
 export const createBatch = (payload: Partial<Omit<Batch, "_id" | "createdAt">> & { students?: string[] }) =>
@@ -358,10 +362,8 @@ export interface ClassItem {
   createdAt: string;
 }
 
-export const getClasses = (params?: { student?: string; batch?: string; coach?: string }) => {
-  const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : "";
-  return adminFetchJSON<ApiListResponse<ClassItem>>(`/classes${query}`);
-};
+export const getClasses = (params?: { student?: string; batch?: string; coach?: string; page?: string | number; limit?: string | number }) =>
+  adminFetchJSON<ApiListResponse<ClassItem>>(`/classes${toQueryString({ limit: 100, ...params })}`);
 
 export const getClass = (id: string) => adminFetchJSON<ApiItemResponse<ClassItem>>(`/classes/${id}`);
 export const createClass = (payload: Partial<Omit<ClassItem, "_id" | "createdAt">>) =>
@@ -400,7 +402,8 @@ export interface TrialClass {
   trialExpiresAt?: string;
 }
 
-export const getTrialClasses = () => adminFetchJSON<ApiListResponse<TrialClass>>("/classes/trials");
+export const getTrialClasses = (params?: { status?: string; coach?: string }) =>
+  adminFetchJSON<ApiListResponse<TrialClass>>(`/classes/trials${toQueryString(params)}`);
 export const scheduleTrialClass = (payload: {
   leadId: string;
   coach: string;
@@ -458,15 +461,11 @@ export interface AttendanceItem {
   disputeApproved?: boolean;
 }
 
-export const getAttendance = (params?: { student?: string; coach?: string; status?: string }) => {
-  const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : "";
-  return adminFetchJSON<ApiListResponse<AttendanceItem>>(`/attendance${query}`);
-};
+export const getAttendance = (params?: { student?: string; coach?: string; status?: string; dateFrom?: string; dateTo?: string; page?: string | number; limit?: string | number }) =>
+  adminFetchJSON<ApiListResponse<AttendanceItem>>(`/attendance${toQueryString({ limit: 100, ...params })}`);
 
-export const getAttendanceStats = (params?: { student?: string; coach?: string }) => {
-  const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : "";
-  return adminFetchJSON<ApiItemResponse<{ total: number; present: number; absent: number; disputed: number; notMarked: number; attendanceRate: number }>>(`/attendance/stats${query}`);
-};
+export const getAttendanceStats = (params?: { student?: string; coach?: string }) =>
+  adminFetchJSON<ApiItemResponse<{ total: number; present: number; absent: number; disputed: number; notMarked: number; attendanceRate: number }>>(`/attendance/stats${toQueryString(params)}`);
 
 // Coach's review queue for student-raised disputes
 export const getDisputedAttendance = (coach?: string) =>
@@ -523,7 +522,8 @@ export interface EvaluationReportPayload {
   recommendedNextLevel: "Beginner" | "Intermediate" | "Advanced" | "Expert" | "Renew";
 }
 
-export const getEvaluationReports = () => adminFetchJSON<ApiListResponse<EvaluationReport>>("/evaluation-reports");
+export const getEvaluationReports = (params?: { student?: string; package?: string; coach?: string; recommendedNextLevel?: string; page?: string | number; limit?: string | number }) =>
+  adminFetchJSON<ApiListResponse<EvaluationReport>>(`/evaluation-reports${toQueryString({ limit: 100, ...params })}`);
 export const getStudentEvaluationReports = (studentId: string) =>
   adminFetchJSON<ApiListResponse<EvaluationReport>>(`/evaluation-reports/student/${studentId}`);
 export const createEvaluationReport = (payload: EvaluationReportPayload) =>
@@ -564,17 +564,13 @@ export const getAuditLogsByEntity = (entityId: string) =>
 
 // ---------- Notifications ----------
 
-export const getNotifications = (params?: { student?: string }) => {
-  const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : "";
-  return adminFetchJSON<ApiListResponse<NotificationItem>>(`/notifications${query}`);
-};
+export const getNotifications = (params?: { student?: string }) =>
+  adminFetchJSON<ApiListResponse<NotificationItem>>(`/notifications${toQueryString(params)}`);
 
 // ---------- Payments ----------
 
-export const getPayments = (params?: { student?: string }) => {
-  const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : "";
-  return adminFetchJSON<ApiListResponse<PaymentItem>>(`/payments${query}`);
-};
+export const getPayments = (params?: { student?: string; status?: string; page?: string | number; limit?: string | number }) =>
+  adminFetchJSON<ApiListResponse<PaymentItem>>(`/payments${toQueryString({ limit: 100, ...params })}`);
 
 // ---------- Student Portal Access ----------
 export const provisionStudentAccess = (id: string, password: string) =>

@@ -161,7 +161,7 @@ export default function LeadsPage() {
   }, [leads, search, statusFilter]);
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader
         title="Leads"
         description="Manage potential student inquiries and conversions"
@@ -175,26 +175,26 @@ export default function LeadsPage() {
       />
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+        <div className="admin-alert admin-alert-error">
           {error}
         </div>
       )}
 
-      <div className="mb-4 flex gap-4">
+      <div className="admin-toolbar">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]" />
           <input
             type="text"
             placeholder="Search leads..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="admin-control admin-control-search"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="admin-control admin-control-select w-full sm:w-auto"
         >
           <option value="">All Statuses</option>
           {LEAD_STATUSES.map((status) => (
@@ -207,58 +207,58 @@ export default function LeadsPage() {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" />
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="admin-table-shell">
+          <table className="admin-table min-w-full">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Interest</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Converted</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="text-left">Student</th>
+                <th className="text-left">Parent</th>
+                <th className="text-left">Contact</th>
+                <th className="text-left">Interest</th>
+                <th className="text-left">Source</th>
+                <th className="text-left">Status</th>
+                <th className="text-left">Converted</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {filteredLeads.map((lead) => (
-                <tr key={lead._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{lead.studentName}</div>
+                <tr key={lead._id}>
+                  <td className="whitespace-nowrap">
+                    <div className="admin-primary-cell">{lead.studentName}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">{lead.parentName}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <td className="whitespace-nowrap">{lead.parentName}</td>
+                  <td className="whitespace-nowrap">
+                    <div className="flex items-center gap-2 text-sm">
                       <Mail className="h-4 w-4" />
                       {lead.email}
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                    <div className="mt-1 flex items-center gap-2 text-sm">
                       <Phone className="h-4 w-4" />
                       {lead.phoneNumber}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">{toTitleLabel(lead.courseInterest)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">{toTitleLabel(lead.leadSource)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="whitespace-nowrap">{toTitleLabel(lead.courseInterest)}</td>
+                  <td className="whitespace-nowrap">{toTitleLabel(lead.leadSource)}</td>
+                  <td className="whitespace-nowrap">
                     <StatusBadge status={lead.status} />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="whitespace-nowrap">
                     {lead.convertedToStudent ? (
-                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Yes</span>
+                      <span className="rounded-full border border-[rgba(63,107,92,0.22)] bg-[var(--color-pine)]/10 px-2.5 py-1 text-xs font-bold text-[var(--color-pine-deep)]">Yes</span>
                     ) : (
-                      <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">No</span>
+                      <span className="rounded-full border border-[rgba(31,27,22,0.16)] bg-[var(--color-walnut)]/10 px-2.5 py-1 text-xs font-bold text-[var(--color-walnut)]">No</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => handleEdit(lead)} className="text-blue-600 hover:text-blue-900 mr-3">
-                      <Pencil className="h-4 w-4 inline" />
+                  <td className="whitespace-nowrap text-right text-sm font-medium">
+                    <button onClick={() => handleEdit(lead)} className="admin-icon-button mr-2" aria-label={`Edit lead ${lead.studentName}`}>
+                      <Pencil className="h-4 w-4" />
                     </button>
-                    <button onClick={() => setDeleteTarget(lead)} className="text-red-600 hover:text-red-900">
-                      <Trash2 className="h-4 w-4 inline" />
+                    <button onClick={() => setDeleteTarget(lead)} className="admin-icon-button admin-icon-button-danger" aria-label={`Delete lead ${lead.studentName}`}>
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </td>
                 </tr>
@@ -266,7 +266,7 @@ export default function LeadsPage() {
             </tbody>
           </table>
           {filteredLeads.length === 0 && (
-            <div className="text-center py-12 text-gray-500">No leads found</div>
+            <div className="admin-empty">No leads found</div>
           )}
         </div>
       )}
@@ -301,7 +301,7 @@ export default function LeadsPage() {
             <select
               value={form.country}
               onChange={(e) => setForm({ ...form, country: e.target.value as SupportedCountry })}
-              className="mb-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`${selectClass} mb-2`}
             >
               {COUNTRY_OPTIONS.map((opt) => (
                 <option key={opt.code} value={opt.code}>
@@ -385,7 +385,7 @@ export default function LeadsPage() {
       </Modal>
 
       <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Lead">
-        <p className="text-gray-600 mb-6">
+        <p className="mb-6 text-[var(--color-muted)]">
           Are you sure you want to delete lead "{deleteTarget?.studentName}"? This action cannot be undone.
         </p>
         <div className="flex justify-end gap-3">

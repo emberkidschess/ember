@@ -30,6 +30,9 @@ export const adminLogin = async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
+        accessToken: result.data.accessToken,
+        refreshToken: result.data.refreshToken,
+        expiresIn: result.data.expiresIn,
         user: result.data.user,
       },
     });
@@ -82,6 +85,9 @@ export const adminRefreshToken = async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
         user: {
           id: admin?._id,
           authId: adminAuth._id,
@@ -89,6 +95,7 @@ export const adminRefreshToken = async (req: Request, res: Response) => {
           email: adminAuth.email,
           role: admin?.role,
           status: adminAuth.status,
+          permissions: ['*'],
           authType: 'admin',
         },
       },

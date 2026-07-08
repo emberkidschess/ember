@@ -227,6 +227,9 @@ ClassSchema.index({ coach: 1, date: 1, status: 1 });
 ClassSchema.index({ students: 1, date: 1, status: 1 });
 ClassSchema.index({ date: 1, startTime: 1, endTime: 1 });
 ClassSchema.index({ leadId: 1, classType: 1, status: 1, trialResult: 1 });
+ClassSchema.index({ classType: 1, date: -1 });
+ClassSchema.index({ coach: 1, status: 1, date: 1, startTime: 1 });
+ClassSchema.index({ batch: 1, status: 1, date: 1 });
 
 const Class: Model<IClass> = mongoose.models.Class || mongoose.model<IClass>('Class', ClassSchema);
 

@@ -100,6 +100,8 @@ EvaluationReportSchema.index({ student: 1, createdAt: -1 });
 EvaluationReportSchema.index({ package: 1 });
 EvaluationReportSchema.index({ coach: 1, createdAt: -1 });
 EvaluationReportSchema.index({ recommendedNextLevel: 1 });
+EvaluationReportSchema.index({ isPublished: 1, student: 1, createdAt: -1 });
+EvaluationReportSchema.index({ isPublished: 1, createdAt: -1 });
 
 const EvaluationReport: Model<IEvaluationReport> = mongoose.models.EvaluationReport || mongoose.model<IEvaluationReport>('EvaluationReport', EvaluationReportSchema);
 

@@ -8,6 +8,7 @@ import { Course } from '../models/Course';
 import { Inquiry } from '../models/Inquiry';
 import Package from '../models/Package';
 import Payment, { PaymentStatus } from '../models/Payment';
+import PaymentLink, { PaymentLinkStatus } from '../models/PaymentLink';
 import Class from '../models/Class';
 import Batch from '../models/Batch';
 import Attendance from '../models/Attendance';
@@ -64,6 +65,7 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
       todayClasses,
       studentsWaitingForPortal,
       recentNotifications,
+      pendingActivations,
     ] = await Promise.all([
       Lead.countDocuments({ convertedToStudent: { $ne: true } }),
       Lead.countDocuments(),
@@ -112,9 +114,18 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
       }),
       Student.countDocuments({ portalStatus: 'expired' }),
       Notification.find()
+        .select('type title message recipient status createdAt')
         .sort({ createdAt: -1 })
         .limit(10)
-        .populate('recipient', 'studentName parentName email'),
+        .populate('recipient', 'studentName parentName email')
+        .lean(),
+      PaymentLink.find({ status: PaymentLinkStatus.WAITING_FOR_ACTIVATION })
+        .populate('student', 'studentName parentName email phoneNumber')
+        .populate('lead', 'studentName parentName email phoneNumber')
+        .select('student lead amount currency status purpose packageType courseLevel paidAt createdAt')
+        .sort({ paidAt: -1 })
+        .limit(10)
+        .lean(),
     ]);
 
     const leadConversionRate = allLeads > 0 ? ((convertedLeads / allLeads) * 100).toFixed(2) : '0';
@@ -134,24 +145,28 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
         .populate('previousPackageId', 'packageType courseLevel')
         .select('student previousPackageId remainingClasses packageType courseLevel status')
         .sort({ remainingClasses: 1 })
-        .limit(20),
+        .limit(20)
+        .lean(),
       AuditLog.find()
         .sort({ createdAt: -1 })
         .limit(20)
         .populate('adminId', 'name email')
         .populate('staffId', 'name email')
         .populate('studentId', 'studentName parentName email')
-        .select('action entityType entityName createdAt adminId staffId studentId success'),
+        .select('action entityType entityName createdAt adminId staffId studentId success')
+        .lean(),
       Lead.find({ convertedToStudent: { $ne: true } })
         .sort({ createdAt: -1 })
         .limit(10)
         .populate('assignedTo', 'name email')
-        .select('studentName parentName email phoneNumber courseInterest status assignedTo createdAt'),
+        .select('studentName parentName email phoneNumber courseInterest status assignedTo createdAt')
+        .lean(),
       Student.find()
         .sort({ createdAt: -1 })
         .limit(10)
         .populate('assignedStaff', 'name email')
-        .select('studentName parentName email course studentStatus enrollmentStatus assignedStaff createdAt'),
+        .select('studentName parentName email course studentStatus enrollmentStatus assignedStaff createdAt')
+        .lean(),
     ]);
 
     const systemHealth = {
@@ -198,6 +213,7 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
       recentLeads,
       recentStudents,
       recentNotifications,
+      pendingActivations,
       packagesNearingCompletion: packagesNearingCompletionAdmin,
       systemHealth,
     };
@@ -221,6 +237,16 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
 
 export const getStaffDashboard = async (req: AuthRequest, res: Response) => {
   try {
+    const cacheKey = generateCacheKey(CacheNamespaces.DASHBOARD_STATS, 'staff');
+    const cached = await CacheService.get(cacheKey);
+    if (cached) {
+      return res.json({
+        success: true,
+        data: cached,
+        cached: true,
+      });
+    }
+
     const [
       totalLeads,
       newLeadsToday,
@@ -240,12 +266,14 @@ export const getStaffDashboard = async (req: AuthRequest, res: Response) => {
         .sort({ createdAt: -1 })
         .limit(10)
         .populate('assignedTo', 'name email')
-        .select('studentName parentName email phoneNumber status assignedTo createdAt'),
+        .select('studentName parentName email phoneNumber status assignedTo createdAt')
+        .lean(),
       Student.find()
         .sort({ createdAt: -1 })
         .limit(10)
         .populate('assignedStaff', 'name email')
-        .select('studentName parentName email studentStatus enrollmentStatus assignedStaff createdAt'),
+        .select('studentName parentName email studentStatus enrollmentStatus assignedStaff createdAt')
+        .lean(),
     ]);
 
     const leadsByStatus = await Lead.aggregate([
@@ -256,9 +284,7 @@ export const getStaffDashboard = async (req: AuthRequest, res: Response) => {
       { $group: { _id: '$studentStatus', count: { $sum: 1 } } },
     ]);
 
-    res.json({
-      success: true,
-      data: {
+    const dashboardData = {
         overview: {
           totalLeads,
           newLeadsToday,
@@ -271,7 +297,14 @@ export const getStaffDashboard = async (req: AuthRequest, res: Response) => {
         },
         recentLeads,
         recentStudents,
-      },
+      };
+
+    await CacheService.set(cacheKey, dashboardData, 120);
+
+    res.json({
+      success: true,
+      data: dashboardData,
+      cached: false,
     });
   } catch (error) {
     console.error('Error fetching staff dashboard:', error);
@@ -304,8 +337,10 @@ export const getAuditLogs = async (req: AuthRequest, res: Response) => {
     }
 
     const logs = await AuditLog.find(filter)
+      .select('action entityType entityId entityName userEmail userName userRole success errorMessage createdAt')
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit as string));
+      .limit(parseInt(limit as string))
+      .lean();
 
     res.json({
       success: true,
@@ -383,7 +418,8 @@ export const getCoachDashboard = async (req: AuthRequest, res: Response) => {
       status: 'scheduled',
     })
       .populate('students', 'studentName parentName email phone')
-      .sort({ startTime: 1 });
+      .sort({ startTime: 1 })
+      .lean();
 
     const endOfWeek = new Date(today);
     endOfWeek.setDate(endOfWeek.getDate() + 7);
@@ -395,7 +431,8 @@ export const getCoachDashboard = async (req: AuthRequest, res: Response) => {
     })
       .populate('students', 'studentName parentName email phone currentPackageId')
       .sort({ date: 1, startTime: 1 })
-      .limit(20);
+      .limit(20)
+      .lean();
 
     const coachStudents = await Student.find({
       assignedStaff: coachId,
@@ -403,7 +440,8 @@ export const getCoachDashboard = async (req: AuthRequest, res: Response) => {
     })
       .populate('currentPackageId', 'packageType courseLevel status remainingClasses completedClasses')
       .select('studentName parentName email phone currentPackageId assignedStaff')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const completedClassesThisMonth = await Class.countDocuments({
@@ -419,7 +457,8 @@ export const getCoachDashboard = async (req: AuthRequest, res: Response) => {
       student: { $in: coachStudentIds },
     })
       .populate('student', 'studentName parentName email phone')
-      .sort({ remainingClasses: 1 });
+      .sort({ remainingClasses: 1 })
+      .lean();
 
     res.json({
       success: true,

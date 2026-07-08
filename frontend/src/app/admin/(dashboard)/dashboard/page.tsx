@@ -21,7 +21,7 @@ import {
 import PageHeader from "@/components/admin/PageHeader";
 import StatCard from "@/components/admin/StatCard";
 import StatusBadge from "@/components/admin/StatusBadge";
-import { getAdminDashboard, getPendingActivations, type PaymentLink } from "@/lib/adminApi";
+import { getAdminDashboard, type PaymentLink } from "@/lib/adminApi";
 import { formatCurrency } from "@/lib/currency";
 import { formatCourseLevel, toTitleLabel } from "@/lib/labels";
 
@@ -48,10 +48,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [dashboardRes, activationsRes] = await Promise.all([
-          getAdminDashboard(),
-          getPendingActivations(),
-        ]);
+        const dashboardRes = await getAdminDashboard();
 
         if (dashboardRes.success) {
            
@@ -60,12 +57,9 @@ export default function AdminDashboardPage() {
           setRecentLeads((dashboardRes.data as any).recentLeads ?? []);
            
           setRecentStudents((dashboardRes.data as any).recentStudents ?? []);
+          setPendingActivations((dashboardRes.data as any).pendingActivations ?? []);
         } else {
           setError(dashboardRes.error || "Failed to load dashboard");
-        }
-
-        if (activationsRes.success) {
-          setPendingActivations(activationsRes.data);
         }
       } catch {
         setError("Could not connect to the server.");

@@ -3,6 +3,7 @@ import Notification, { NotificationStatus, NotificationType } from '../models/No
 import DeliveryLog, { DeliveryStatus } from '../models/DeliveryLog';
 import { AuthRequest } from '../middleware/auth';
 import { retryFailedNotifications, retryNotificationById, sendNotification } from '../utils/notificationProcessor';
+import { sanitizeQueryParam } from '../utils/validation';
 
 export const getNotifications = async (req: AuthRequest, res: Response) => {
   try {
@@ -10,15 +11,21 @@ export const getNotifications = async (req: AuthRequest, res: Response) => {
     
     const filter: any = {};
     
-    if (recipient) filter.recipient = recipient;
-    if (status) filter.status = status;
-    if (type) filter.type = type;
-    if (channel) filter.channel = channel;
+    const sanitizedRecipient = sanitizeQueryParam(recipient);
+    const sanitizedStatus = sanitizeQueryParam(status);
+    const sanitizedType = sanitizeQueryParam(type);
+    const sanitizedChannel = sanitizeQueryParam(channel);
+    if (sanitizedRecipient) filter.recipient = sanitizedRecipient;
+    if (sanitizedStatus) filter.status = sanitizedStatus;
+    if (sanitizedType) filter.type = sanitizedType;
+    if (sanitizedChannel) filter.channel = sanitizedChannel;
 
     const notifications = await Notification.find(filter)
       .populate('recipient', 'name email')
+      .select('recipient recipientType type channel status content sentAt errorMessage retryCount createdAt')
       .sort({ createdAt: -1 })
-      .limit(100);
+      .limit(100)
+      .lean();
 
     res.json({
       success: true,
@@ -36,7 +43,8 @@ export const getNotifications = async (req: AuthRequest, res: Response) => {
 export const getNotificationById = async (req: AuthRequest, res: Response) => {
   try {
     const notification = await Notification.findById(req.params.id)
-      .populate('recipient', 'name email');
+      .populate('recipient', 'name email')
+      .lean();
     
     if (!notification) {
       return res.status(404).json({
@@ -138,14 +146,19 @@ export const getDeliveryLogs = async (req: AuthRequest, res: Response) => {
     
     const filter: any = {};
     
-    if (notificationId) filter.notificationId = notificationId;
-    if (channel) filter.channel = channel;
-    if (status) filter.status = status;
+    const sanitizedNotificationId = sanitizeQueryParam(notificationId);
+    const sanitizedChannel = sanitizeQueryParam(channel);
+    const sanitizedStatus = sanitizeQueryParam(status);
+    if (sanitizedNotificationId) filter.notificationId = sanitizedNotificationId;
+    if (sanitizedChannel) filter.channel = sanitizedChannel;
+    if (sanitizedStatus) filter.status = sanitizedStatus;
 
     const logs = await DeliveryLog.find(filter)
       .populate('notificationId', 'type content')
+      .select('notificationId channel recipient status messageId errorMessage retryCount sentAt createdAt')
       .sort({ createdAt: -1 })
-      .limit(100);
+      .limit(100)
+      .lean();
 
     res.json({
       success: true,

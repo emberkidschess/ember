@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { ClientAuthService } from '../services/clientAuthService';
 import { PasswordResetService } from '../services/passwordResetService';
 import ClientAuth from '../models/ClientAuth';
+import Student from '../models/Student';
 import { clearAuthCookies, refreshTokenFromRequest, setAuthCookies } from '../utils/authCookies';
 
 export const clientLogin = async (req: Request, res: Response) => {
@@ -27,6 +28,9 @@ export const clientLogin = async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
+        accessToken: result.data.accessToken,
+        refreshToken: result.data.refreshToken,
+        expiresIn: result.data.expiresIn,
         user: result.data.user,
       },
     });
@@ -72,11 +76,25 @@ export const clientRefreshToken = async (req: Request, res: Response) => {
       });
     }
     const tokens = await ClientAuthService.generateTokens(clientAuth, ipAddress, userAgent);
+    const student = await Student.findById(clientAuth.profileId);
     setAuthCookies(res, 'client', tokens.accessToken, tokens.refreshToken);
 
     res.json({
       success: true,
-      data: { expiresIn: tokens.expiresIn },
+      data: {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
+        user: student ? {
+          id: student._id,
+          authId: clientAuth._id,
+          name: student.studentName,
+          email: clientAuth.email,
+          role: 'student',
+          status: clientAuth.status,
+          authType: 'client',
+        } : undefined,
+      },
     });
   } catch (error) {
     console.error('Client refresh token error:', error);

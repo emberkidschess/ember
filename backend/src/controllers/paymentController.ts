@@ -3,24 +3,43 @@ import Payment, { PaymentStatus } from '../models/Payment';
 import { AuthRequest } from '../middleware/auth';
 import AuditLog, { AuditAction, AuditEntityType } from '../models/AuditLog';
 import { buildAuditLogData } from '../middleware/auditLogger';
+import { sanitizePaginationParams, sanitizeQueryParam } from '../utils/validation';
 
 export const getPayments = async (req: AuthRequest, res: Response) => {
   try {
-    const { student, status } = req.query;
+    const { student, status, page = '1', limit = '100' } = req.query;
     
     const filter: any = {};
     
-    if (student) filter.student = student;
-    if (status) filter.status = status;
+    const sanitizedStudent = sanitizeQueryParam(student);
+    const sanitizedStatus = sanitizeQueryParam(status);
+    if (sanitizedStudent) filter.student = sanitizedStudent;
+    if (sanitizedStatus) filter.status = sanitizedStatus;
 
-    const payments = await Payment.find(filter)
-      .populate('student', 'studentName parentName email phone')
-      .populate('createdBy', 'name email')
-      .sort({ createdAt: -1 });
+    const { page: pageNum, limit: limitNum } = sanitizePaginationParams(page, limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [payments, total] = await Promise.all([
+      Payment.find(filter)
+        .populate('student', 'studentName parentName email phoneNumber')
+        .populate('createdBy', 'name email')
+        .select('student lead paymentLink package packageType courseLevel amount currency status paymentMethod manualPaymentReference paymentDate verifiedBy createdBy createdAt')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Payment.countDocuments(filter),
+    ]);
 
     res.json({
       success: true,
       data: payments,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error) {
     console.error('Error fetching payments:', error);

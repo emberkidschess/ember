@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Inquiry } from '../models/Inquiry';
 import type { ApiResponse, InquiryDocument } from '../types';
 import { inquirySchema } from '../validations/schemas';
+import { sanitizePaginationParams, sanitizeQueryParam } from '../utils/validation';
 
 export const createInquiry = async (req: Request, res: Response<ApiResponse<InquiryDocument>>) => {
   try {
@@ -30,10 +31,31 @@ export const createInquiry = async (req: Request, res: Response<ApiResponse<Inqu
 
 export const getInquiries = async (req: Request, res: Response) => {
   try {
-    const inquiries = await Inquiry.find().sort({ createdAt: -1 });
+    const { status, page = '1', limit = '100' } = req.query;
+    const filter: Record<string, unknown> = {};
+    const sanitizedStatus = sanitizeQueryParam(status);
+    if (sanitizedStatus) filter.status = sanitizedStatus;
+
+    const { page: pageNum, limit: limitNum } = sanitizePaginationParams(page, limit);
+    const skip = (pageNum - 1) * limitNum;
+    const [inquiries, total] = await Promise.all([
+      Inquiry.find(filter)
+        .select('name email phone country message status createdAt')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Inquiry.countDocuments(filter),
+    ]);
     res.json({
       success: true,
       data: inquiries,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error) {
     console.error('Error fetching inquiries:', error);
@@ -46,7 +68,7 @@ export const getInquiries = async (req: Request, res: Response) => {
 
 export const getInquiryById = async (req: Request, res: Response) => {
   try {
-    const inquiry = await Inquiry.findById(req.params.id);
+    const inquiry = await Inquiry.findById(req.params.id).lean();
     if (!inquiry) {
       return res.status(404).json({
         success: false,

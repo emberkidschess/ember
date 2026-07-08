@@ -9,27 +9,48 @@ import { sendNotification } from '../utils/notificationProcessor';
 import { NotificationType, NotificationChannel } from '../models/Notification';
 import Staff, { StaffRole, StaffStatus } from '../models/Staff';
 import { primaryFrontendUrl } from '../utils/frontendUrl';
+import { sanitizePaginationParams, sanitizeQueryParam } from '../utils/validation';
 
 export const getEvaluationReports = async (req: AuthRequest, res: Response) => {
   try {
-    const { student, package: packageId, coach, recommendedNextLevel } = req.query;
+    const { student, package: packageId, coach, recommendedNextLevel, page = '1', limit = '100' } = req.query;
     
     const filter: any = {};
     
-    if (student) filter.student = student;
-    if (packageId) filter.package = packageId;
-    if (coach) filter.coach = coach;
-    if (recommendedNextLevel) filter.recommendedNextLevel = recommendedNextLevel;
+    const sanitizedStudent = sanitizeQueryParam(student);
+    const sanitizedPackage = sanitizeQueryParam(packageId);
+    const sanitizedCoach = sanitizeQueryParam(coach);
+    const sanitizedNextLevel = sanitizeQueryParam(recommendedNextLevel);
+    if (sanitizedStudent) filter.student = sanitizedStudent;
+    if (sanitizedPackage) filter.package = sanitizedPackage;
+    if (sanitizedCoach) filter.coach = sanitizedCoach;
+    if (sanitizedNextLevel) filter.recommendedNextLevel = sanitizedNextLevel;
 
-    const reports = await EvaluationReport.find(filter)
-      .populate('student', 'studentName parentName email phone')
-      .populate('package', 'packageType courseLevel status')
-      .populate('coach', 'name email')
-      .sort({ createdAt: -1 });
+    const { page: pageNum, limit: limitNum } = sanitizePaginationParams(page, limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [reports, total] = await Promise.all([
+      EvaluationReport.find(filter)
+        .populate('student', 'studentName parentName email phoneNumber')
+        .populate('package', 'packageType courseLevel status')
+        .populate('coach', 'name email')
+        .select('student package coach title strengths weaknesses tacticalSkills openingKnowledge endgameUnderstanding recommendedNextLevel isPublished publishedAt createdAt')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      EvaluationReport.countDocuments(filter),
+    ]);
 
     res.json({
       success: true,
       data: reports,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error) {
     console.error('Error fetching evaluation reports:', error);

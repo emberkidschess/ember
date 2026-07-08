@@ -29,4 +29,6 @@ const TestimonialSchema = new Schema(
   }
 );
 
+TestimonialSchema.index({ isActive: 1, order: 1 });
+
 export const Testimonial = mongoose.model<TestimonialDocument>('Testimonial', TestimonialSchema);

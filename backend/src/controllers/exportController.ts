@@ -9,7 +9,10 @@ import { generateCSV, formatDateForExport, formatCurrencyForExport } from '../ut
 
 export const exportStudents = async (req: AuthRequest, res: Response) => {
   try {
-    const students = await Student.find().sort({ createdAt: -1 });
+    const students = await Student.find()
+      .select('studentName parentName email phoneNumber country course studentStatus enrollmentStatus createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
     
     const headers = ['studentName', 'parentName', 'email', 'phoneNumber', 'country', 'course', 'studentStatus', 'enrollmentStatus', 'createdAt'];
     const csvData = students.map(s => ({
@@ -40,7 +43,10 @@ export const exportStudents = async (req: AuthRequest, res: Response) => {
 
 export const exportLeads = async (req: AuthRequest, res: Response) => {
   try {
-    const leads = await Lead.find().sort({ createdAt: -1 });
+    const leads = await Lead.find()
+      .select('studentName parentName email phoneNumber country courseInterest status leadSource createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
     
     const headers = ['studentName', 'parentName', 'email', 'phoneNumber', 'country', 'courseInterest', 'status', 'leadSource', 'createdAt'];
     const csvData = leads.map(l => ({
@@ -74,7 +80,9 @@ export const exportClasses = async (req: AuthRequest, res: Response) => {
     const classes = await Class.find()
       .populate('students', 'studentName parentName')
       .populate('coach', 'name email')
-      .sort({ date: -1 });
+      .select('students coach course classType date startTime endTime status createdAt')
+      .sort({ date: -1 })
+      .lean();
     
     const headers = ['studentName', 'coachName', 'course', 'classType', 'date', 'startTime', 'endTime', 'status', 'createdAt'];
     const csvData = classes.flatMap((c) =>
@@ -111,7 +119,9 @@ export const exportAttendance = async (req: AuthRequest, res: Response) => {
       .populate('student', 'studentName parentName')
       .populate('coach', 'name email')
       .populate('class', 'course date startTime endTime')
-      .sort({ markedAt: -1 });
+      .select('student coach class status markedAt')
+      .sort({ markedAt: -1 })
+      .lean();
     
     const headers = ['studentName', 'coachName', 'course', 'date', 'startTime', 'endTime', 'status', 'markedAt'];
     const csvData = attendance.map(a => ({
@@ -143,7 +153,9 @@ export const exportPayments = async (req: AuthRequest, res: Response) => {
   try {
     const payments = await Payment.find()
       .populate('student', 'studentName parentName')
-      .sort({ createdAt: -1 });
+      .select('student amount currency paymentDate status createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
     
     const headers = ['studentName', 'parentName', 'amount', 'paymentDate', 'status', 'createdAt'];
     const csvData = payments.map(p => ({

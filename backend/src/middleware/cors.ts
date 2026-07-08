@@ -12,18 +12,35 @@ function allowedOrigins(): Set<string> {
   return new Set(origins);
 }
 
+function isAllowedOrigin(origin: string | undefined, allowed: Set<string>): boolean {
+  if (!origin) return false;
+  if (allowed.has(origin)) return true;
+
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const url = new URL(origin);
+      return ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
 export const corsHandler = (req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin?.replace(/\/$/, '');
   const allowed = allowedOrigins();
+  const originAllowed = isAllowedOrigin(origin, allowed);
 
   // Reject browser requests from unknown origins at the server boundary.
   // Relying only on the browser hiding a CORS response can still allow a
   // state-changing request to execute when cross-site cookies are enabled.
-  if (origin && !allowed.has(origin)) {
+  if (origin && !originAllowed) {
     return res.status(403).json({ success: false, error: 'Origin is not allowed' });
   }
 
-  if (origin && allowed.has(origin)) {
+  if (origin && originAllowed) {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
   }

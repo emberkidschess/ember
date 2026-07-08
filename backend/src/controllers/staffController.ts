@@ -35,7 +35,8 @@ export const getStaff = async (req: AuthRequest, res: Response) => {
       .select(isAdmin
         ? 'name email role status expertise permissions salaryPerClass createdAt'
         : 'name email role status expertise createdAt')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     const staffData = staff.map((s: any) => ({
       _id: s._id.toString(),
@@ -64,7 +65,7 @@ export const getStaff = async (req: AuthRequest, res: Response) => {
 
 export const getStaffById = async (req: AuthRequest, res: Response) => {
   try {
-    const staff = await Staff.findOne({ _id: req.params.id });
+    const staff = await Staff.findOne({ _id: req.params.id }).lean();
 
     if (!staff) {
       return res.status(404).json({
@@ -74,7 +75,7 @@ export const getStaffById = async (req: AuthRequest, res: Response) => {
     }
 
     const staffData = {
-      ...staff.toObject(),
+      ...staff,
       _id: staff._id.toString(),
       id: staff._id.toString(),
     };

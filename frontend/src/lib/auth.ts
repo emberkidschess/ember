@@ -40,7 +40,20 @@ const STORAGE_KEYS = {
   legacyUser: "ches_user",
 } as const;
 
+const TOKEN_STORAGE_KEYS = {
+  admin: "ches_admin_tokens",
+  staff: "ches_staff_tokens",
+} as const;
+
+interface AuthTokenSet {
+  accessToken?: string;
+  refreshToken?: string;
+  expiresIn?: number;
+}
+
 const memoryUsers: Partial<Record<"admin" | "staff", AuthUser>> = {};
+const memoryTokens: Partial<Record<"admin" | "staff", AuthTokenSet>> = {};
+const refreshInFlight: Partial<Record<"admin" | "staff", Promise<boolean>>> = {};
 
 function requireApiUrl(): string {
   if (!API_URL) {
@@ -58,6 +71,10 @@ function portalFromPath(): "admin" | "staff" {
 
 function storageKey(portal: "admin" | "staff") {
   return STORAGE_KEYS[portal];
+}
+
+function tokenStorageKey(portal: "admin" | "staff") {
+  return TOKEN_STORAGE_KEYS[portal];
 }
 
 function storageGet(key: string): string | null {
@@ -97,7 +114,9 @@ function storeUser(portal: "admin" | "staff", user: AuthUser): void {
 
 function clearUser(portal: "admin" | "staff"): void {
   delete memoryUsers[portal];
+  delete memoryTokens[portal];
   storageRemove(storageKey(portal));
+  storageRemove(tokenStorageKey(portal));
   storageRemove(STORAGE_KEYS.legacyUser);
 }
 
@@ -110,6 +129,68 @@ function parseStoredUser(value: string | null, portal: "admin" | "staff"): AuthU
     storageRemove(storageKey(portal));
     return null;
   }
+}
+
+function storeTokens(portal: "admin" | "staff", data?: AuthResponse["data"]): void {
+  if (!data?.accessToken && !data?.refreshToken) return;
+  const existing = getAuthTokens(portal) || {};
+  const nextTokens: AuthTokenSet = {
+    accessToken: data.accessToken || existing.accessToken,
+    refreshToken: data.refreshToken || existing.refreshToken,
+    expiresIn: data.expiresIn || existing.expiresIn,
+  };
+  memoryTokens[portal] = nextTokens;
+  storageSet(tokenStorageKey(portal), JSON.stringify(nextTokens));
+}
+
+function parseStoredTokens(value: string | null): AuthTokenSet | null {
+  if (!value) return null;
+  try {
+    const tokens = JSON.parse(value) as AuthTokenSet;
+    if (typeof tokens.accessToken !== "string" && typeof tokens.refreshToken !== "string") {
+      return null;
+    }
+    return tokens;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthTokens(portal: "admin" | "staff" = getPortal()): AuthTokenSet | null {
+  if (typeof window === "undefined") return null;
+  return memoryTokens[portal] || parseStoredTokens(storageGet(tokenStorageKey(portal)));
+}
+
+function headersToRecord(headers?: HeadersInit): Record<string, string> {
+  if (!headers) return {};
+  if (headers instanceof Headers) {
+    const result: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      result[key] = value;
+    });
+    return result;
+  }
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers.map(([key, value]) => [key, String(value)]));
+  }
+  return { ...(headers as Record<string, string>) };
+}
+
+function buildAuthHeaders(
+  portal: "admin" | "staff",
+  headers?: HeadersInit,
+  includeJson = true
+): Record<string, string> {
+  const result: Record<string, string> = includeJson ? { "Content-Type": "application/json" } : {};
+  Object.assign(result, headersToRecord(headers));
+
+  const hasAuthorization = Object.keys(result).some((key) => key.toLowerCase() === "authorization");
+  const accessToken = getAuthTokens(portal)?.accessToken;
+  if (!hasAuthorization && accessToken) {
+    result.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return result;
 }
 
 /** Which portal is currently being used by the current route. Defaults to admin. */
@@ -132,23 +213,24 @@ export async function login(
   const data: AuthResponse = await response.json();
 
   if (data.success && data.data) {
-    // Tokens are now set as httpOnly cookies by the backend
-    storeUser(portal, data.data.user);
+    // Cookies remain primary. Tokens are a Safari-safe fallback for hosted
+    // frontend/backend pairs where cross-site cookies can be blocked.
+    if (data.data.user) storeUser(portal, data.data.user);
+    storeTokens(portal, data.data);
   }
 
   return data;
 }
 
 export async function logout(portal: "admin" | "staff" = getPortal()): Promise<void> {
-
   try {
+    const refreshToken = getAuthTokens(portal)?.refreshToken;
+    const body = refreshToken ? JSON.stringify({ refreshToken }) : undefined;
     await fetch(`${requireApiUrl()}/auth/${portal}/logout`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Auth-Portal": portal,
-      },
-      credentials: 'include',
+      headers: buildAuthHeaders(portal, { "X-Auth-Portal": portal }, Boolean(body)),
+      credentials: "include",
+      body,
     });
   } catch (error) {
     console.error("Logout request failed (clearing local session anyway):", error);
@@ -158,32 +240,46 @@ export async function logout(portal: "admin" | "staff" = getPortal()): Promise<v
 }
 
 export async function refreshAccessToken(portal: "admin" | "staff" = getPortal()): Promise<boolean> {
-  try {
-    const response = await fetch(`${requireApiUrl()}/auth/${portal}/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Auth-Portal": portal },
-      credentials: 'include',
-    });
+  if (refreshInFlight[portal]) return refreshInFlight[portal] as Promise<boolean>;
 
-    // Handle 401/403 responses from refresh endpoint - token is expired or invalid
-    if (response.status === 401 || response.status === 403) {
+  const refreshPromise = (async () => {
+    try {
+      const tokens = getAuthTokens(portal);
+      const body = tokens?.refreshToken ? JSON.stringify({ refreshToken: tokens.refreshToken }) : undefined;
+      const response = await fetch(`${requireApiUrl()}/auth/${portal}/refresh`, {
+        method: "POST",
+        headers: buildAuthHeaders(portal, { "X-Auth-Portal": portal }, Boolean(body)),
+        credentials: "include",
+        body,
+      });
+
+      // Handle 401/403 responses from refresh endpoint - token is expired or invalid
+      if (response.status === 401 || response.status === 403) {
+        clearUser(portal);
+        return false;
+      }
+
+      const data: AuthResponse = await response.json();
+
+      if (data.success && data.data) {
+        if (data.data.user) storeUser(portal, data.data.user);
+        storeTokens(portal, data.data);
+        return true;
+      }
+
       clearUser(portal);
       return false;
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      return false;
     }
+  })();
 
-    const data: AuthResponse = await response.json();
-
-    if (data.success && data.data) {
-      // New tokens are set as httpOnly cookies by the backend
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    console.error("Token refresh failed:", error);
-    // Clear session on network errors to prevent infinite loops
-    clearUser(portal);
-    return false;
+  refreshInFlight[portal] = refreshPromise;
+  try {
+    return await refreshPromise;
+  } finally {
+    delete refreshInFlight[portal];
   }
 }
 
@@ -220,14 +316,14 @@ export function hasAnyPermission(...permissions: string[]): boolean {
 
 export async function verifySession(portal: "admin" | "staff" = getPortal()): Promise<AuthUser | null> {
   let response = await fetch(`${requireApiUrl()}/auth/${portal}/session`, {
-    headers: { "X-Auth-Portal": portal },
+    headers: buildAuthHeaders(portal, { "X-Auth-Portal": portal }, false),
     credentials: "include",
   });
   if (response.status === 401) {
     const refreshed = await refreshAccessToken(portal);
     if (refreshed) {
       response = await fetch(`${requireApiUrl()}/auth/${portal}/session`, {
-        headers: { "X-Auth-Portal": portal },
+        headers: buildAuthHeaders(portal, { "X-Auth-Portal": portal }, false),
         credentials: "include",
       });
     }
@@ -245,6 +341,7 @@ export async function verifySession(portal: "admin" | "staff" = getPortal()): Pr
   }
 
   storeUser(portal, user);
+  storeTokens(portal, data.data);
   return user;
 }
 
@@ -259,22 +356,18 @@ export async function adminFetch(
 ): Promise<Response> {
   const url = `${requireApiUrl()}${endpoint}`;
   const portal = getPortal();
-  const requestOptions: RequestInit = {
+  const buildRequestOptions = (): RequestInit => ({
     ...options,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Auth-Portal": portal,
-      ...options.headers,
-    },
-  };
+    headers: buildAuthHeaders(portal, { "X-Auth-Portal": portal, ...headersToRecord(options.headers) }),
+  });
 
-  let response = await fetch(url, requestOptions);
+  let response = await fetch(url, buildRequestOptions());
 
   if (response.status === 401) {
     const refreshed = await refreshAccessToken(portal);
     if (refreshed) {
-      response = await fetch(url, requestOptions);
+      response = await fetch(url, buildRequestOptions());
     }
   }
 

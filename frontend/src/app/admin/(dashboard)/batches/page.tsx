@@ -313,30 +313,29 @@ export default function BatchesPage() {
 
       {error && <div className="bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)] px-4 py-3 rounded-xl mb-4 text-sm">{error}</div>}
 
-      <div className="bg-[var(--color-paper)] rounded-2xl border border-[var(--color-line)] shadow-[var(--shadow-card)] overflow-hidden">
+      <div className="admin-table-shell">
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 text-[var(--color-ember)] animate-spin" />
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" />
           </div>
         ) : filtered.length === 0 ? (
-          <p className="text-center py-16 text-sm text-[var(--color-muted)]">No batches found.</p>
+          <div className="admin-empty">No batches found</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--color-line)] text-left text-xs font-bold uppercase tracking-wider text-[var(--color-muted)]">
-                  <th className="px-5 py-3">Batch</th>
-                  <th className="px-5 py-3">Level</th>
-                  <th className="px-5 py-3">Coach</th>
-                  <th className="px-5 py-3">Students</th>
-                  <th className="px-5 py-3">Course Sessions</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-line)]">
-                {filtered.map((batch) => (
-                  <tr key={batch._id} className="hover:bg-[var(--color-ivory)]/60 transition-colors">
+          <table className="admin-table min-w-full">
+            <thead>
+              <tr>
+                <th className="text-left">Batch</th>
+                <th className="text-left">Level</th>
+                <th className="text-left">Coach</th>
+                <th className="text-left">Students</th>
+                <th className="text-left">Course Sessions</th>
+                <th className="text-left">Status</th>
+                <th className="text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((batch) => (
+                <tr key={batch._id}>
                     <td className="px-5 py-3.5">
                       <p className="font-medium text-[var(--color-walnut)]">{batch.name}</p>
                       {batch.schedule && <p className="text-xs text-[var(--color-muted)] mt-0.5">{batch.schedule}</p>}
@@ -433,7 +432,6 @@ export default function BatchesPage() {
                 ))}
               </tbody>
             </table>
-          </div>
         )}
       </div>
 

@@ -286,17 +286,17 @@ export default function StudentProfilePage() {
       {/* Summary strip */}
       <div className="flex flex-wrap gap-2 mb-6">
         {provisionSuccess && (
-          <div className="w-full flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-4 py-2.5 rounded-xl text-sm">
+          <div className="admin-alert admin-alert-success flex w-full items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0" /> {provisionSuccess}
           </div>
         )}
         {freezeSuccess && (
-          <div className="w-full flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-4 py-2.5 rounded-xl text-sm">
+          <div className="admin-alert admin-alert-success flex w-full items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0" /> {freezeSuccess}
           </div>
         )}
         {student.portalStatus === "frozen" && (
-          <div className="w-full flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2.5 rounded-xl text-sm">
+          <div className="admin-note flex w-full items-center gap-2 px-4 py-2.5 text-sm">
             <Snowflake className="h-4 w-4 shrink-0" />
             Classes paused{student.frozenReason ? `: ${student.frozenReason}` : ""}
             {student.frozenAt ? ` · since ${new Date(student.frozenAt).toLocaleDateString()}` : ""}

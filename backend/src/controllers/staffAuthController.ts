@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { StaffAuthService } from '../services/staffAuthService';
 import { PasswordResetService } from '../services/passwordResetService';
 import StaffAuth from '../models/StaffAuth';
+import Staff from '../models/Staff';
 import { clearAuthCookies, refreshTokenFromRequest, setAuthCookies } from '../utils/authCookies';
 
 export const staffLogin = async (req: Request, res: Response) => {
@@ -29,6 +30,9 @@ export const staffLogin = async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
+        accessToken: result.data.accessToken,
+        refreshToken: result.data.refreshToken,
+        expiresIn: result.data.expiresIn,
         user: result.data.user,
       },
     });
@@ -74,12 +78,27 @@ export const staffRefreshToken = async (req: Request, res: Response) => {
       });
     }
     const tokens = await StaffAuthService.generateTokens(staffAuth, ipAddress, userAgent);
+    const staff = await Staff.findById(staffAuth.profileId);
 
     setAuthCookies(res, 'staff', tokens.accessToken, tokens.refreshToken);
 
     res.json({
       success: true,
-      data: { expiresIn: tokens.expiresIn },
+      data: {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
+        user: staff ? {
+          id: staff._id,
+          authId: staffAuth._id,
+          name: staff.name,
+          email: staffAuth.email,
+          role: staff.role,
+          status: staffAuth.status,
+          permissions: staff.permissions || [],
+          authType: 'staff',
+        } : undefined,
+      },
     });
   } catch (error) {
     console.error('Staff refresh token error:', error);

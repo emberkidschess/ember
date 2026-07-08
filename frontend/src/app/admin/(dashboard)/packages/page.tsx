@@ -160,7 +160,7 @@ export default function PackagesPage() {
   };
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader
         title="Packages"
         description="Manage package history and exceptional manual package assignments"
@@ -168,21 +168,21 @@ export default function PackagesPage() {
       />
 
       {error && (
-        <div role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">
+        <div role="alert" className="admin-alert admin-alert-error">
           {error}
         </div>
       )}
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+      <div className="admin-toolbar">
         <label className="relative flex-1">
           <span className="sr-only">Search packages</span>
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]" />
           <input
             type="search"
             placeholder="Search packages..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="admin-control admin-control-search"
           />
         </label>
         <label>
@@ -190,7 +190,7 @@ export default function PackagesPage() {
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
-            className="w-full rounded-md border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="admin-control admin-control-select w-full sm:w-auto"
           >
             <option value="">All statuses</option>
             {PACKAGE_STATUSES.map((status) => (
@@ -204,42 +204,42 @@ export default function PackagesPage() {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" aria-label="Loading packages" />
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" aria-label="Loading packages" />
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg bg-white shadow">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="admin-table-shell">
+          <table className="admin-table min-w-full">
+            <thead>
               <tr>
                 {["Student", "Session Plan", "Level", "Used", "Remaining", "Status", "Actions"].map((heading) => (
                   <th
                     key={heading}
-                    className={`${heading === "Actions" ? "text-right" : "text-left"} px-6 py-3 text-xs font-medium uppercase tracking-wider text-gray-500`}
+                    className={heading === "Actions" ? "text-right" : "text-left"}
                   >
                     {heading}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
+            <tbody>
               {filteredPackages.map((pkg) => {
                 const isLocked = pkg.status === "active" || pkg.status === "queued";
                 return (
-                  <tr key={pkg._id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-6 py-4 font-medium text-gray-900">{studentName(pkg)}</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-gray-500">{pkg.packageType}</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-gray-500">{formatCourseLevel(pkg.courseLevel)}</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-gray-500">
+                  <tr key={pkg._id}>
+                    <td className="whitespace-nowrap admin-primary-cell">{studentName(pkg)}</td>
+                    <td className="whitespace-nowrap">{pkg.packageType}</td>
+                    <td className="whitespace-nowrap">{formatCourseLevel(pkg.courseLevel)}</td>
+                    <td className="whitespace-nowrap">
                       {pkg.regularClassesCompleted}/{pkg.totalClasses}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-gray-500">{pkg.remainingClasses}</td>
-                    <td className="whitespace-nowrap px-6 py-4"><StatusBadge status={pkg.status} /></td>
-                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                    <td className="whitespace-nowrap">{pkg.remainingClasses}</td>
+                    <td className="whitespace-nowrap"><StatusBadge status={pkg.status} /></td>
+                    <td className="whitespace-nowrap text-right">
                       <button
                         type="button"
                         onClick={() => openEdit(pkg)}
                         disabled={isLocked}
-                        className="mr-3 text-blue-600 hover:text-blue-900 disabled:cursor-not-allowed disabled:text-gray-300"
+                        className="admin-icon-button mr-2"
                         aria-label={`Edit ${pkg.packageType} for ${studentName(pkg)}`}
                         title={isLocked ? "Active and queued packages cannot be edited" : "Edit package"}
                       >
@@ -249,7 +249,7 @@ export default function PackagesPage() {
                         type="button"
                         onClick={() => setDeleteTarget(pkg)}
                         disabled={isLocked}
-                        className="text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:text-gray-300"
+                        className="admin-icon-button admin-icon-button-danger"
                         aria-label={`Delete ${pkg.packageType} for ${studentName(pkg)}`}
                         title={isLocked ? "Active and queued packages cannot be deleted" : "Delete package"}
                       >
@@ -262,7 +262,7 @@ export default function PackagesPage() {
             </tbody>
           </table>
           {filteredPackages.length === 0 && (
-            <div className="py-12 text-center text-gray-500">No packages match the current filters.</div>
+            <div className="admin-empty">No packages match the current filters.</div>
           )}
         </div>
       )}
@@ -311,7 +311,7 @@ export default function PackagesPage() {
                 {COURSE_LEVELS.map((level) => <option key={level}>{level}</option>)}
               </select>
             </FormField>
-            <p className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            <p className="admin-note px-3 py-2 text-sm">
               Session credits are fixed by the selected plan and cannot be edited manually.
             </p>
           </div>
@@ -326,7 +326,7 @@ export default function PackagesPage() {
       </Modal>
 
       <Modal open={Boolean(deleteTarget)} onClose={() => !deleting && setDeleteTarget(null)} title="Delete Package">
-        <p className="mb-6 text-gray-600">
+        <p className="mb-6 text-[var(--color-muted)]">
           Delete this historical package? Packages linked to attendance, payments, or report cards are protected by the server.
         </p>
         <div className="flex justify-end gap-3">

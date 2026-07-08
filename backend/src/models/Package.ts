@@ -127,6 +127,8 @@ PackageSchema.index({ student: 1, status: 1 });
 PackageSchema.index({ student: 1, createdAt: -1 });
 PackageSchema.index({ status: 1, enrollmentDate: -1 });
 PackageSchema.index({ courseLevel: 1, status: 1 });
+PackageSchema.index({ status: 1, remainingClasses: 1 });
+PackageSchema.index({ courseLevel: 1, totalClasses: 1, status: 1 });
 
 PackageSchema.pre('save', function(next) {
   const modifiedPaths = this.modifiedPaths() as string[];

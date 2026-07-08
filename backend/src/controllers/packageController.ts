@@ -22,6 +22,7 @@ import {
   assertPackageCanRenew,
   assertPackageCanUpgrade,
 } from '../services/enrollmentLifecycleService';
+import { sanitizePaginationParams, sanitizeQueryParam } from '../utils/validation';
 
 function sendPackageError(res: Response, error: unknown, fallback: string) {
   const isRuleError = error instanceof EnrollmentRuleError;
@@ -80,23 +81,42 @@ async function linkActivePackageToStudent(
 
 export const getPackages = async (req: AuthRequest, res: Response) => {
   try {
-    const { student, status, courseLevel } = req.query;
+    const { student, status, courseLevel, page = '1', limit = '100' } = req.query;
     
     const filter: any = {};
     
-    if (student) filter.student = student;
-    if (status) filter.status = status;
-    if (courseLevel) filter.courseLevel = courseLevel;
+    const sanitizedStudent = sanitizeQueryParam(student);
+    const sanitizedStatus = sanitizeQueryParam(status);
+    const sanitizedCourseLevel = sanitizeQueryParam(courseLevel);
+    if (sanitizedStudent) filter.student = sanitizedStudent;
+    if (sanitizedStatus) filter.status = sanitizedStatus;
+    if (sanitizedCourseLevel) filter.courseLevel = sanitizedCourseLevel;
 
-    const packages = await Package.find(filter)
-      .populate('student', 'studentName parentName email phone')
-      .populate('previousPackageId', 'packageType courseLevel status')
-      .populate('nextPackageId', 'packageType courseLevel status')
-      .sort({ createdAt: -1 });
+    const { page: pageNum, limit: limitNum } = sanitizePaginationParams(page, limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [packages, total] = await Promise.all([
+      Package.find(filter)
+        .populate('student', 'studentName parentName email phoneNumber')
+        .populate('previousPackageId', 'packageType courseLevel status')
+        .populate('nextPackageId', 'packageType courseLevel status')
+        .select('student packageType courseLevel status totalClasses completedClasses remainingClasses regularClassesCompleted enrollmentDate completionDate previousPackageId nextPackageId createdAt')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Package.countDocuments(filter),
+    ]);
 
     res.json({
       success: true,
       data: packages,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error) {
     console.error('Error fetching packages:', error);

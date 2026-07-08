@@ -43,65 +43,65 @@ export default function StaffLeadsPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" />
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6">
+    <div>
       <PageHeader
         title="Leads"
         description="View and manage potential student inquiries"
       />
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+        <div className="admin-alert admin-alert-error">
           {error}
         </div>
       )}
 
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <div className="admin-toolbar">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]" />
           <input
             type="text"
             placeholder="Search leads..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="admin-control admin-control-search"
           />
         </div>
       </div>
 
-        <div className="overflow-x-auto rounded-lg bg-white shadow">
-          <table className="min-w-[900px] divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <div className="admin-table-shell">
+          <table className="admin-table min-w-[900px]">
+          <thead>
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Interest</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="text-left">Student</th>
+              <th className="text-left">Parent</th>
+              <th className="text-left">Contact</th>
+              <th className="text-left">Interest</th>
+              <th className="text-left">Status</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {filteredLeads.map((lead) => (
-              <tr key={lead._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{lead.studentName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-500">{lead.parentName}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+              <tr key={lead._id}>
+                <td className="whitespace-nowrap admin-primary-cell">{lead.studentName}</td>
+                <td className="whitespace-nowrap">{lead.parentName}</td>
+                <td className="whitespace-nowrap">
+                  <div className="flex items-center gap-2 text-sm">
                     <Mail className="h-4 w-4" />
                     {lead.email}
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                  <div className="mt-1 flex items-center gap-2 text-sm">
                     <Phone className="h-4 w-4" />
                     {lead.phoneNumber}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-500">{toTitleLabel(lead.courseInterest)}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="whitespace-nowrap">{toTitleLabel(lead.courseInterest)}</td>
+                <td className="whitespace-nowrap">
                   <StatusBadge status={lead.status} />
                 </td>
               </tr>
@@ -109,7 +109,7 @@ export default function StaffLeadsPage() {
           </tbody>
         </table>
         {filteredLeads.length === 0 && (
-          <div className="text-center py-12 text-gray-500">No leads found</div>
+          <div className="admin-empty">No leads found</div>
         )}
       </div>
     </div>

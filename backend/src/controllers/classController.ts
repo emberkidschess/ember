@@ -154,7 +154,8 @@ export const getClasses = async (req: AuthRequest, res: Response) => {
         .populate('createdBy', 'name email')
         .sort({ date: 1, startTime: 1 })
         .skip(skip)
-        .limit(limitNum),
+        .limit(limitNum)
+        .lean(),
       Class.countDocuments(filter)
     ]);
 
@@ -188,7 +189,8 @@ export const getClassById = async (req: AuthRequest, res: Response) => {
     const classData = await Class.findById(req.params.id)
       .populate('students', 'studentName parentName email phone')
       .populate('coach', 'name email')
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .lean();
     
     if (!classData) {
       return res.status(404).json({
@@ -1323,7 +1325,10 @@ export const getTrialClasses = async (req: AuthRequest, res: Response) => {
       .populate('leadId', 'studentName parentName email phoneNumber')
       .populate('coach', 'name email')
       .populate('trialResultMarkedBy', 'name email')
-      .sort({ date: -1 });
+      .select('leadId coach date startTime endTime timezone meetingLink classType status trialResult trialResultNotes trialResultMarkedBy trialResultMarkedAt trialAttendanceStatus trialJoinedAt trialAttemptNumber trialReminderSentAt trialExpiresAt createdAt')
+      .sort({ date: -1 })
+      .limit(100)
+      .lean();
 
     res.json({
       success: true,

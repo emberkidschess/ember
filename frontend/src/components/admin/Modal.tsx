@@ -29,16 +29,20 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" onClick={onClose} aria-hidden="true" />
       <div
-        className={`relative w-full ${maxWidth} bg-[var(--color-paper)] rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto`}
+        className={`relative max-h-[90vh] w-full ${maxWidth} overflow-y-auto rounded-[22px] border border-[var(--color-line)] bg-[var(--color-paper)] shadow-2xl`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-line)] sticky top-0 bg-[var(--color-paper)] z-10">
-          <h2 className="font-semibold text-lg text-[var(--color-walnut)]">{title}</h2>
-          <button onClick={onClose} className="text-[var(--color-muted)] hover:text-[var(--color-walnut)]" aria-label="Close">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-line)] bg-[rgba(255,253,248,0.94)] px-6 py-4 backdrop-blur-md">
+          <h2 className="font-[family-name:var(--font-playfair)] text-xl font-bold text-[var(--color-walnut)]">{title}</h2>
+          <button
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-line)] text-[var(--color-muted)] transition hover:bg-[var(--color-ivory)] hover:text-[var(--color-walnut)]"
+            aria-label="Close"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>

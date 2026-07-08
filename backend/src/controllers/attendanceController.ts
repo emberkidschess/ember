@@ -18,6 +18,7 @@ import { ClientAuthService } from '../services/clientAuthService';
 import { sendNotification } from '../utils/notificationProcessor';
 import { NotificationChannel, NotificationType } from '../models/Notification';
 import { ensureBatchSessionPlan } from '../domain/courseEnrollment';
+import { sanitizePaginationParams, sanitizeQueryParam } from '../utils/validation';
 
 export async function finalizeClassBatchProgress(
   classId: mongoose.Types.ObjectId | string,
@@ -239,29 +240,50 @@ async function firePackageSessionNotifications(
 
 export const getAttendance = async (req: AuthRequest, res: Response) => {
   try {
-    const { student, coach, status, dateFrom, dateTo } = req.query;
+    const { student, coach, status, dateFrom, dateTo, page = '1', limit = '100' } = req.query;
 
     const filter: any = {};
 
-    if (student) filter.student = student;
-    if (coach) filter.coach = coach;
-    if (status) filter.status = status;
+    const sanitizedStudent = sanitizeQueryParam(student);
+    const sanitizedCoach = sanitizeQueryParam(coach);
+    const sanitizedStatus = sanitizeQueryParam(status);
+    if (sanitizedStudent) filter.student = sanitizedStudent;
+    if (sanitizedCoach) filter.coach = sanitizedCoach;
+    if (sanitizedStatus) filter.status = sanitizedStatus;
     if (dateFrom || dateTo) {
       filter.markedAt = {};
-      if (dateFrom) filter.markedAt.$gte = new Date(dateFrom as string);
-      if (dateTo) filter.markedAt.$lte = new Date(dateTo as string);
+      const sanitizedDateFrom = sanitizeQueryParam(dateFrom);
+      const sanitizedDateTo = sanitizeQueryParam(dateTo);
+      if (sanitizedDateFrom) filter.markedAt.$gte = new Date(sanitizedDateFrom);
+      if (sanitizedDateTo) filter.markedAt.$lte = new Date(sanitizedDateTo);
     }
 
-    const attendance = await Attendance.find(filter)
-      .populate('class', 'course date startTime endTime classType')
-      .populate('student', 'studentName parentName email phoneNumber')
-      .populate('coach', 'name email')
-      .populate('markedBy', 'name email')
-      .sort({ markedAt: -1 });
+    const { page: pageNum, limit: limitNum } = sanitizePaginationParams(page, limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [attendance, total] = await Promise.all([
+      Attendance.find(filter)
+        .populate('class', 'course date startTime endTime classType')
+        .populate('student', 'studentName parentName email phoneNumber')
+        .populate('coach', 'name email')
+        .populate('markedBy', 'name email')
+        .select('class student coach status source markedBy markedAt joinClickedAt notes attendanceConsumed disputeReason disputeRaisedAt disputeResolvedAt disputeResolvedBy disputeApproved createdAt')
+        .sort({ markedAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Attendance.countDocuments(filter),
+    ]);
 
     res.json({
       success: true,
       data: attendance,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error) {
     console.error('Error fetching attendance:', error);
@@ -279,13 +301,17 @@ export const getDisputedAttendance = async (req: AuthRequest, res: Response) => 
   try {
     const { coach } = req.query;
     const filter: any = { status: AttendanceStatus.DISPUTED };
-    if (coach) filter.coach = coach;
+    const sanitizedCoach = sanitizeQueryParam(coach);
+    if (sanitizedCoach) filter.coach = sanitizedCoach;
 
     const disputes = await Attendance.find(filter)
       .populate('class', 'course date startTime endTime classType')
       .populate('student', 'studentName parentName email')
       .populate('coach', 'name email')
-      .sort({ disputeRaisedAt: 1 }); // oldest first - FIFO queue
+      .select('class student coach status source markedAt notes disputeReason disputeRaisedAt disputeResolvedAt createdAt')
+      .sort({ disputeRaisedAt: 1 })
+      .limit(100)
+      .lean(); // oldest first - FIFO queue
 
     res.json({
       success: true,
@@ -801,14 +827,21 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response) => {
     const { student, coach } = req.query;
 
     const filter: any = {};
-    if (student) filter.student = student;
-    if (coach) filter.coach = coach;
+    const sanitizedStudent = sanitizeQueryParam(student);
+    const sanitizedCoach = sanitizeQueryParam(coach);
+    if (sanitizedStudent) filter.student = sanitizedStudent;
+    if (sanitizedCoach) filter.coach = sanitizedCoach;
 
-    const total = await Attendance.countDocuments(filter);
-    const present = await Attendance.countDocuments({ ...filter, status: AttendanceStatus.PRESENT });
-    const absent = await Attendance.countDocuments({ ...filter, status: AttendanceStatus.ABSENT });
-    const disputed = await Attendance.countDocuments({ ...filter, status: AttendanceStatus.DISPUTED });
-    const notMarked = await Attendance.countDocuments({ ...filter, status: AttendanceStatus.NOT_MARKED });
+    const grouped = await Attendance.aggregate([
+      { $match: filter },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]);
+    const byStatus = Object.fromEntries(grouped.map((item) => [item._id, item.count]));
+    const present = byStatus[AttendanceStatus.PRESENT] || 0;
+    const absent = byStatus[AttendanceStatus.ABSENT] || 0;
+    const disputed = byStatus[AttendanceStatus.DISPUTED] || 0;
+    const notMarked = byStatus[AttendanceStatus.NOT_MARKED] || 0;
+    const total = present + absent + disputed + notMarked;
     const markedTotal = present + absent;
     const attendanceRate = markedTotal > 0 ? ((present / markedTotal) * 100).toFixed(2) : '0';
 

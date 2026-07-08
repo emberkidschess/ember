@@ -49,7 +49,8 @@ export const getBatches = async (req: AuthRequest, res: Response) => {
         .select('name courseLevel coach students status schedule timezone startDate completedAt notes totalSessions sessionsCompleted sessions createdAt')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limitNum),
+        .limit(limitNum)
+        .lean(),
       Batch.countDocuments(filter)
     ]);
 
@@ -102,7 +103,10 @@ export const getBatchHistory = async (req: AuthRequest, res: Response) => {
     const batches = await Batch.find(filter)
       .populate('students', 'studentName parentName')
       .populate('coach', 'name email')
-      .sort({ completedAt: -1 });
+      .select('name courseLevel coach students status schedule timezone startDate completedAt totalSessions sessionsCompleted createdAt')
+      .sort({ completedAt: -1 })
+      .limit(100)
+      .lean();
 
     res.json({
       success: true,
@@ -122,7 +126,8 @@ export const getBatchById = async (req: AuthRequest, res: Response) => {
     const batch = await Batch.findById(req.params.id)
       .populate('students', 'studentName parentName email phoneNumber studentStatus')
       .populate('coach', 'name email')
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .lean();
 
     if (!batch) {
       return res.status(404).json({

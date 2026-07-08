@@ -205,7 +205,7 @@ export default function StaffPage() {
   }, [staff, search, roleFilter]);
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader
         title="Staff"
         description="Manage coaches and staff members"
@@ -219,26 +219,26 @@ export default function StaffPage() {
       />
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+        <div className="admin-alert admin-alert-error">
           {error}
         </div>
       )}
 
-      <div className="mb-4 flex gap-4">
+      <div className="admin-toolbar">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]" />
           <input
             type="text"
             placeholder="Search staff..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="admin-control admin-control-search"
           />
         </div>
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="admin-control admin-control-select w-full sm:w-auto"
         >
           <option value="">All Roles</option>
           {ROLES.map((role) => (
@@ -251,49 +251,49 @@ export default function StaffPage() {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" />
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="admin-table-shell">
+          <table className="admin-table min-w-full">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expertise</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="text-left">Name</th>
+                <th className="text-left">Email</th>
+                <th className="text-left">Role</th>
+                <th className="text-left">Status</th>
+                <th className="text-left">Expertise</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {filteredStaff.map((staffMember) => (
-                <tr key={staffMember._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{staffMember.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">{staffMember.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">
-                    <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                <tr key={staffMember._id}>
+                  <td className="whitespace-nowrap admin-primary-cell">{staffMember.name}</td>
+                  <td className="whitespace-nowrap">{staffMember.email}</td>
+                  <td className="whitespace-nowrap">
+                    <span className="admin-role-pill">
                       {staffMember.role.toUpperCase()}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="whitespace-nowrap">
                     <StatusBadge status={staffMember.status} />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                  <td className="whitespace-nowrap">
                     {staffMember.expertise?.join(", ") || "-"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => handleEdit(staffMember)} className="text-blue-600 hover:text-blue-900 mr-3">
-                      <Pencil className="h-4 w-4 inline" />
+                  <td className="whitespace-nowrap text-right text-sm font-medium">
+                    <button onClick={() => handleEdit(staffMember)} className="admin-icon-button mr-2" aria-label={`Edit staff ${staffMember.name}`}>
+                      <Pencil className="h-4 w-4" />
                     </button>
-                    <button onClick={() => setResetPasswordTarget(staffMember)} className="text-orange-600 hover:text-orange-900 mr-3" title="Reset Password">
-                      <Key className="h-4 w-4 inline" />
+                    <button onClick={() => setResetPasswordTarget(staffMember)} className="admin-icon-button mr-2" title="Reset Password" aria-label={`Reset password for ${staffMember.name}`}>
+                      <Key className="h-4 w-4" />
                     </button>
-                    <button onClick={() => handleToggleStatus(staffMember)} className="text-purple-600 hover:text-purple-900 mr-3" title="Toggle Status">
-                      <Shield className="h-4 w-4 inline" />
+                    <button onClick={() => handleToggleStatus(staffMember)} className="admin-icon-button mr-2" title="Toggle Status" aria-label={`Toggle status for ${staffMember.name}`}>
+                      <Shield className="h-4 w-4" />
                     </button>
-                    <button onClick={() => setDeleteTarget(staffMember)} className="text-red-600 hover:text-red-900">
-                      <Trash2 className="h-4 w-4 inline" />
+                    <button onClick={() => setDeleteTarget(staffMember)} className="admin-icon-button admin-icon-button-danger" aria-label={`Delete staff ${staffMember.name}`}>
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </td>
                 </tr>
@@ -301,7 +301,7 @@ export default function StaffPage() {
             </tbody>
           </table>
           {filteredStaff.length === 0 && (
-            <div className="text-center py-12 text-gray-500">No staff members found</div>
+            <div className="admin-empty">No staff members found</div>
           )}
         </div>
       )}
@@ -354,10 +354,10 @@ export default function StaffPage() {
                   key={level}
                   type="button"
                   onClick={() => handleExpertiseToggle(level)}
-                  className={`px-3 py-1 text-sm rounded-full ${
+                  className={`rounded-full border px-3 py-1.5 text-sm font-bold transition ${
                     form.expertise.includes(level)
-                      ? "bg-blue-100 text-blue-800"
-                      : "bg-gray-100 text-gray-800"
+                      ? "border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]"
+                      : "border-[var(--color-line)] bg-[var(--color-paper)] text-[var(--color-muted)] hover:bg-[var(--color-ivory)]"
                   }`}
                 >
                   {level}
@@ -368,12 +368,12 @@ export default function StaffPage() {
           <FormField label="Permissions">
             <div className="grid grid-cols-2 gap-2">
               {PERMISSIONS.map((permission) => (
-                <label key={permission} className="flex items-center gap-2 text-sm">
+                <label key={permission} className="flex items-center gap-2 rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm text-[var(--color-muted)]">
                   <input
                     type="checkbox"
                     checked={form.permissions.includes(permission)}
                     onChange={() => handlePermissionToggle(permission)}
-                    className="rounded border-gray-300"
+                    className="rounded border-[var(--color-line)] accent-[var(--color-ember)]"
                   />
                   {permission.replace(/_/g, " ")}
                 </label>
@@ -393,7 +393,7 @@ export default function StaffPage() {
       </Modal>
 
       <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Staff Member">
-        <p className="text-gray-600 mb-6">
+        <p className="mb-6 text-[var(--color-muted)]">
           Are you sure you want to delete staff member "{deleteTarget?.name}"? This action cannot be undone.
         </p>
         <div className="flex justify-end gap-3">
@@ -408,7 +408,7 @@ export default function StaffPage() {
       </Modal>
 
       <Modal open={!!resetPasswordTarget} onClose={() => setResetPasswordTarget(null)} title="Reset Password">
-        <p className="text-gray-600 mb-6">
+        <p className="mb-6 text-[var(--color-muted)]">
           Are you sure you want to reset the password for "{resetPasswordTarget?.name}"? A temporary password will be generated.
         </p>
         <div className="flex justify-end gap-3">
@@ -423,11 +423,11 @@ export default function StaffPage() {
       </Modal>
 
       <Modal open={Boolean(generatedCredential)} onClose={() => setGeneratedCredential(null)} title="Temporary Credential">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-[var(--color-muted)]">
           Share this one-time password securely with {generatedCredential?.name}. It will not be shown again after this dialog closes.
         </p>
-        <div className="my-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
-          <code className="break-all text-lg font-semibold text-gray-900">{generatedCredential?.password}</code>
+        <div className="my-5 rounded-2xl border border-[var(--color-line)] bg-[var(--color-ivory)] p-4">
+          <code className="break-all text-lg font-bold text-[var(--color-walnut)]">{generatedCredential?.password}</code>
         </div>
         <div className="flex justify-end">
           <button type="button" onClick={() => setGeneratedCredential(null)} className={primaryButtonClass}>I have saved it</button>

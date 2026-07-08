@@ -14,6 +14,23 @@ function allowedOrigins(): Set<string> {
   return new Set(configured);
 }
 
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return false;
+  const normalized = origin.replace(/\/$/, '');
+  if (allowedOrigins().has(normalized)) return true;
+
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const url = new URL(normalized);
+      return ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
 /**
  * Kept as a compatibility hook for the route registry. CSRF enforcement is
  * performed by validateCSRFToken only when a request is authenticated by a
@@ -54,7 +71,7 @@ export const validateCSRFToken = (req: Request, res: Response, next: NextFunctio
     }
   }
 
-  if (!requestOrigin || !allowedOrigins().has(requestOrigin.replace(/\/$/, ''))) {
+  if (!isAllowedOrigin(requestOrigin)) {
     return res.status(403).json({
       success: false,
       error: 'Request origin could not be verified',

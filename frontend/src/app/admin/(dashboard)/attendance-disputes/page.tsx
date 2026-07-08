@@ -82,12 +82,12 @@ export default function AttendanceDisputesPage() {
       />
 
       {successMsg && (
-        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-4 py-2.5 rounded-xl text-sm mb-4">
+        <div className="admin-alert admin-alert-success flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 shrink-0" /> {successMsg}
         </div>
       )}
       {error && (
-        <div className="bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)] px-4 py-2.5 rounded-xl text-sm mb-4">{error}</div>
+        <div className="admin-alert admin-alert-error">{error}</div>
       )}
 
       {loading ? (

@@ -6,6 +6,15 @@ import { accessTokenFromRequest } from '../utils/authCookies';
 
 export interface ClientAuthRequest extends Request {
   client?: TokenPayload;
+  studentUser?: {
+    id: string;
+    authId: string;
+    name: string;
+    email: string;
+    role: 'student';
+    status: string;
+    authType: 'client';
+  };
 }
 
 export const authenticateClient = async (req: ClientAuthRequest, res: Response, next: NextFunction) => {
@@ -79,6 +88,15 @@ export const authenticateClient = async (req: ClientAuthRequest, res: Response, 
     }
 
     req.client = payload;
+    req.studentUser = {
+      id: student._id.toString(),
+      authId: clientAuth._id.toString(),
+      name: student.studentName,
+      email: clientAuth.email,
+      role: 'student',
+      status: clientAuth.status,
+      authType: 'client',
+    };
     next();
   } catch (error) {
     return res.status(401).json({

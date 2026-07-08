@@ -18,4 +18,7 @@ const ProdigySchema = new Schema(
   }
 );
 
+ProdigySchema.index({ isSpotlight: 1, order: 1 });
+ProdigySchema.index({ order: 1 });
+
 export const Prodigy = mongoose.model<ProdigyDocument>('Prodigy', ProdigySchema);

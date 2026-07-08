@@ -64,7 +64,8 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
         .select('studentName parentName email phoneNumber country course studentStatus enrollmentStatus assignedStaff leadId currentPackageId currentBatchId packageHistory notes timezone portalStatus frozenReason frozenAt createdAt')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limitNum),
+        .limit(limitNum)
+        .lean(),
       Student.countDocuments(filter)
     ]);
 
@@ -110,7 +111,8 @@ export const getStudentById = async (req: AuthRequest, res: Response) => {
         'currentPackageId',
         'packageType courseLevel status totalClasses completedClasses remainingClasses regularClassesCompleted enrollmentDate'
       )
-      .populate('packageHistory', 'packageType courseLevel status completedClasses');
+      .populate('packageHistory', 'packageType courseLevel status completedClasses')
+      .lean();
     
     if (!student) {
       return res.status(404).json({

@@ -53,54 +53,54 @@ export default function StaffClassesPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" />
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6">
+    <div>
       <PageHeader
         title="Classes"
         description="View and manage scheduled classes"
       />
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+        <div className="admin-alert admin-alert-error">
           {error}
         </div>
       )}
 
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <div className="admin-toolbar">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]" />
           <input
             type="text"
             placeholder="Search classes..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="admin-control admin-control-search"
           />
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg bg-white shadow">
-        <table className="min-w-[800px] divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="admin-table-shell">
+        <table className="admin-table min-w-[800px]">
+          <thead>
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Topic</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="text-left">Topic</th>
+              <th className="text-left">Batch</th>
+              <th className="text-left">Date & Time</th>
+              <th className="text-left">Duration</th>
+              <th className="text-left">Status</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {filteredClasses.map((cls) => (
-              <tr key={cls._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{cls.course}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-500">{getBatchName(cls.batch)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+              <tr key={cls._id}>
+                <td className="whitespace-nowrap admin-primary-cell">{cls.course}</td>
+                <td className="whitespace-nowrap">{getBatchName(cls.batch)}</td>
+                <td className="whitespace-nowrap">
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4" />
                     {new Date(cls.date).toLocaleDateString(undefined, { timeZone: "UTC" })}
@@ -110,10 +110,10 @@ export default function StaffClassesPage() {
                     {cls.startTime}–{cls.endTime} {cls.timezone}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-500">{getClassDuration(cls.startTime, cls.endTime)}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="whitespace-nowrap">{getClassDuration(cls.startTime, cls.endTime)}</td>
+                <td className="whitespace-nowrap">
                   <div className="flex items-center gap-2">
-                    {cls.status === "completed" && <CheckCircle className="h-4 w-4 text-green-500" />}
+                    {cls.status === "completed" && <CheckCircle className="h-4 w-4 text-[var(--color-pine)]" />}
                     <StatusBadge status={cls.status} />
                   </div>
                 </td>
@@ -122,7 +122,7 @@ export default function StaffClassesPage() {
           </tbody>
         </table>
         {filteredClasses.length === 0 && (
-          <div className="text-center py-12 text-gray-500">No classes found</div>
+          <div className="admin-empty">No classes found</div>
         )}
       </div>
     </div>

@@ -127,6 +127,8 @@ const BatchSchema: Schema = new Schema(
 BatchSchema.index({ courseLevel: 1, name: 1 }, { unique: true });
 BatchSchema.index({ status: 1, courseLevel: 1 });
 BatchSchema.index({ coach: 1, status: 1 });
+BatchSchema.index({ status: 1, completedAt: -1 });
+BatchSchema.index({ createdAt: -1 });
 
 BatchSchema.pre('validate', function(next) {
   const batch = this as any;

@@ -183,6 +183,8 @@ PaymentLinkSchema.index({ student: 1, status: 1 });
 PaymentLinkSchema.index({ lead: 1, status: 1 });
 PaymentLinkSchema.index({ status: 1, createdAt: -1 });
 PaymentLinkSchema.index({ expiresAt: 1, status: 1 });
+PaymentLinkSchema.index({ purpose: 1, status: 1, createdAt: -1 });
+PaymentLinkSchema.index({ createdBy: 1, createdAt: -1 });
 
 // Do not use a MongoDB TTL index here. Payment links are accounting/support
 // records and must be preserved after expiry; controllers and scheduled jobs

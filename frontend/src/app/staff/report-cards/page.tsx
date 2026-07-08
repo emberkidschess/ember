@@ -229,65 +229,67 @@ export default function StaffReportCardsPage() {
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>;
+    return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" /></div>;
   }
 
   return (
-    <div className="p-4 sm:p-6">
+    <div>
       <PageHeader
         title="Report Cards"
         description="Create completion reports, review drafts, publish to student portals, and export copies"
         actions={canCreate ? [{ label: "Create Report Card", icon: Plus, onClick: openCreate }] : undefined}
       />
 
-      {error && <div role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">{error}</div>}
-      {message && <div role="status" className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-green-800">{message}</div>}
+      {error && <div role="alert" className="admin-alert admin-alert-error">{error}</div>}
+      {message && <div role="status" className="admin-alert admin-alert-success">{message}</div>}
 
-      <label className="relative mb-4 block">
-        <span className="sr-only">Search report cards</span>
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-        <input
-          type="search"
-          placeholder="Search report cards..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </label>
+      <div className="admin-toolbar">
+        <label className="relative block flex-1">
+          <span className="sr-only">Search report cards</span>
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]" />
+          <input
+            type="search"
+            placeholder="Search report cards..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="admin-control admin-control-search"
+          />
+        </label>
+      </div>
 
-      <div className="overflow-x-auto rounded-lg bg-white shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="admin-table-shell">
+        <table className="admin-table min-w-full">
+          <thead>
             <tr>
               {["Student", "Package", "Coach", "Created", "Status", "Actions"].map((heading) => (
-                <th key={heading} className={`${heading === "Actions" ? "text-right" : "text-left"} px-6 py-3 text-xs font-medium uppercase tracking-wider text-gray-500`}>{heading}</th>
+                <th key={heading} className={heading === "Actions" ? "text-right" : "text-left"}>{heading}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody>
             {filteredReports.map((report) => (
-              <tr key={report._id} className="hover:bg-gray-50">
-                <td className="whitespace-nowrap px-6 py-4 font-medium text-gray-900">{entityName(report.student)}</td>
-                <td className="whitespace-nowrap px-6 py-4 text-gray-500">{packageLabel(report.package)}</td>
-                <td className="whitespace-nowrap px-6 py-4 text-gray-500">{entityName(report.coach)}</td>
-                <td className="whitespace-nowrap px-6 py-4 text-gray-500">{new Date(report.createdAt).toLocaleDateString()}</td>
-                <td className="whitespace-nowrap px-6 py-4">
-                  <span className={`rounded-full px-2 py-1 text-xs font-medium ${report.isPublished ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+              <tr key={report._id}>
+                <td className="whitespace-nowrap admin-primary-cell">{entityName(report.student)}</td>
+                <td className="whitespace-nowrap">{packageLabel(report.package)}</td>
+                <td className="whitespace-nowrap">{entityName(report.coach)}</td>
+                <td className="whitespace-nowrap">{new Date(report.createdAt).toLocaleDateString()}</td>
+                <td className="whitespace-nowrap">
+                  <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${report.isPublished ? "border-[rgba(63,107,92,0.22)] bg-[var(--color-pine)]/10 text-[var(--color-pine-deep)]" : "border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]"}`}>
                     {report.isPublished ? "Published" : "Draft"}
                   </span>
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-right">
-                  <button type="button" onClick={() => setViewReport(report)} className="mr-3 text-blue-600 hover:text-blue-900" aria-label="View report"><Eye className="h-4 w-4" /></button>
+                <td className="whitespace-nowrap text-right">
+                  <button type="button" onClick={() => setViewReport(report)} className="admin-icon-button mr-2" aria-label="View report"><Eye className="h-4 w-4" /></button>
                   {!report.isPublished && canCreate && (
                     <>
-                      <button type="button" onClick={() => openEdit(report)} className="mr-3 text-amber-600 hover:text-amber-900" aria-label="Edit draft"><Pencil className="h-4 w-4" /></button>
-                      <button type="button" onClick={() => handlePublish(report)} disabled={publishingId === report._id} className="mr-3 text-green-600 hover:text-green-900 disabled:opacity-50" aria-label="Publish report">
+                      <button type="button" onClick={() => openEdit(report)} className="admin-icon-button mr-2" aria-label="Edit draft"><Pencil className="h-4 w-4" /></button>
+                      <button type="button" onClick={() => handlePublish(report)} disabled={publishingId === report._id} className="admin-icon-button mr-2" aria-label="Publish report">
                         {publishingId === report._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                       </button>
                     </>
                   )}
                   {canExport && (
-                    <button type="button" onClick={() => downloadReport(report)} className="text-purple-600 hover:text-purple-900" aria-label="Download report"><Download className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => downloadReport(report)} className="admin-icon-button" aria-label="Download report"><Download className="h-4 w-4" /></button>
                   )}
                 </td>
               </tr>
@@ -295,8 +297,8 @@ export default function StaffReportCardsPage() {
           </tbody>
         </table>
         {filteredReports.length === 0 && (
-          <div className="py-12 text-center text-gray-500">
-            <FileText className="mx-auto mb-3 h-8 w-8 text-gray-300" />
+          <div className="admin-empty">
+            <FileText className="mx-auto mb-3 h-8 w-8 text-[var(--color-muted)]" />
             No report cards found. Completed packages without an existing report are eligible.
           </div>
         )}
@@ -351,18 +353,18 @@ export default function StaffReportCardsPage() {
         {viewReport && (
           <div className="space-y-5 text-sm">
             <div>
-              <p className="text-lg font-semibold text-gray-900">{entityName(viewReport.student)}</p>
-              <p className="text-gray-500">{packageLabel(viewReport.package)} · Coach {entityName(viewReport.coach)}</p>
+              <p className="text-lg font-bold text-[var(--color-walnut)]">{entityName(viewReport.student)}</p>
+              <p className="text-[var(--color-muted)]">{packageLabel(viewReport.package)} · Coach {entityName(viewReport.coach)}</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               {[["Tactical", viewReport.tacticalSkills], ["Opening", viewReport.openingKnowledge], ["Endgame", viewReport.endgameUnderstanding]].map(([label, score]) => (
-                <div key={label} className="rounded-xl bg-gray-50 p-4"><p className="text-gray-500">{label}</p><p className="text-2xl font-bold text-gray-900">{score}/10</p></div>
+                <div key={label} className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-ivory)] p-4"><p className="text-[var(--color-muted)]">{label}</p><p className="text-2xl font-bold text-[var(--color-walnut)]">{score}/10</p></div>
               ))}
             </div>
-            <div><h3 className="font-semibold text-gray-900">Strengths</h3><p className="mt-1 text-gray-600">{viewReport.strengths.join(", ") || "None recorded"}</p></div>
-            <div><h3 className="font-semibold text-gray-900">Areas to improve</h3><p className="mt-1 text-gray-600">{viewReport.weaknesses.join(", ") || "None recorded"}</p></div>
-            <div><h3 className="font-semibold text-gray-900">Coach notes</h3><p className="mt-1 whitespace-pre-wrap text-gray-600">{viewReport.coachNotes || "No notes"}</p></div>
-            <div><h3 className="font-semibold text-gray-900">Recommendation</h3><p className="mt-1 text-gray-600">{viewReport.recommendedNextLevel}</p></div>
+            <div><h3 className="font-bold text-[var(--color-walnut)]">Strengths</h3><p className="mt-1 text-[var(--color-muted)]">{viewReport.strengths.join(", ") || "None recorded"}</p></div>
+            <div><h3 className="font-bold text-[var(--color-walnut)]">Areas to improve</h3><p className="mt-1 text-[var(--color-muted)]">{viewReport.weaknesses.join(", ") || "None recorded"}</p></div>
+            <div><h3 className="font-bold text-[var(--color-walnut)]">Coach notes</h3><p className="mt-1 whitespace-pre-wrap text-[var(--color-muted)]">{viewReport.coachNotes || "No notes"}</p></div>
+            <div><h3 className="font-bold text-[var(--color-walnut)]">Recommendation</h3><p className="mt-1 text-[var(--color-muted)]">{viewReport.recommendedNextLevel}</p></div>
             {canExport && (
               <div className="flex justify-end"><button type="button" onClick={() => downloadReport(viewReport)} className={primaryButtonClass}><Download className="h-4 w-4" />Download</button></div>
             )}

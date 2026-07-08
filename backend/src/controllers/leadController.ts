@@ -107,9 +107,11 @@ export const getLeads = async (req: AuthRequest, res: Response) => {
     const [leads, total] = await Promise.all([
       Lead.find(filter)
         .populate('assignedTo', 'name email')
+        .select('studentName parentName email phoneNumber country courseInterest leadSource leadCategory status notes assignedTo convertedToStudent studentId followUpDate lastContactDate createdAt')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limitNum),
+        .limit(limitNum)
+        .lean(),
       Lead.countDocuments(filter)
     ]);
 

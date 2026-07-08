@@ -1,28 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Users, Calendar, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { CalendarClock, GraduationCap, Loader2, TrendingUp, Users } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
+import StatCard from "@/components/admin/StatCard";
+import StatusBadge from "@/components/admin/StatusBadge";
 import { getStaffDashboard } from "@/lib/adminApi";
 
-interface StaffDashboardActivity {
-  title: string;
-  description: string;
-}
-
-interface StaffDashboardScheduleItem {
-  title: string;
-  time: string;
-  status: string;
-}
-
 interface StaffDashboardData {
-  totalStudents?: number;
-  upcomingClasses?: number;
-  attendanceRate?: number;
-  pendingTasks?: number;
-  recentActivity?: StaffDashboardActivity[];
-  todaySchedule?: StaffDashboardScheduleItem[];
+  overview?: {
+    totalLeads?: number;
+    newLeadsToday?: number;
+    totalStudents?: number;
+    activeStudents?: number;
+  };
+  recentLeads?: Record<string, unknown>[];
+  recentStudents?: Record<string, unknown>[];
 }
 
 export default function StaffDashboardPage() {
@@ -30,136 +23,104 @@ export default function StaffDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const response = await getStaffDashboard();
-      if (response.success) {
-        setData(response.data as StaffDashboardData);
-      } else {
-        setError(response.error || "Failed to load dashboard data");
-      }
-    } catch {
-      setError("Could not connect to the server.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    load();
+    let mounted = true;
+    (async () => {
+      try {
+        const response = await getStaffDashboard();
+        if (!mounted) return;
+        if (response.success) {
+          setData(response.data as StaffDashboardData);
+        } else {
+          setError(response.error || "Failed to load dashboard data");
+        }
+      } catch {
+        if (mounted) setError("Could not connect to the server.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-7 w-7 animate-spin text-[var(--color-ember)]" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-6">
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
-          {error}
-        </div>
+      <div className="rounded-xl border border-[var(--color-ember)]/20 bg-[var(--color-ember)]/10 px-5 py-4 text-[var(--color-ember-deep)]">
+        {error}
       </div>
     );
   }
 
-  const recentActivity = data?.recentActivity ?? [];
-  const todaySchedule = data?.todaySchedule ?? [];
+  const overview = data?.overview || {};
+  const recentLeads = data?.recentLeads || [];
+  const recentStudents = data?.recentStudents || [];
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader
         title="Staff Dashboard"
-        description="Welcome to your staff dashboard"
+        description="Your operational snapshot for lead follow-up and student management."
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Students</p>
-              <p className="text-2xl font-bold text-gray-900">{data?.totalStudents || 0}</p>
-            </div>
-            <Users className="h-8 w-8 text-blue-500" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Upcoming Classes</p>
-              <p className="text-2xl font-bold text-gray-900">{data?.upcomingClasses || 0}</p>
-            </div>
-            <Calendar className="h-8 w-8 text-green-500" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Attendance Rate</p>
-              <p className="text-2xl font-bold text-gray-900">{data?.attendanceRate || 0}%</p>
-            </div>
-            <CheckCircle className="h-8 w-8 text-purple-500" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Pending Tasks</p>
-              <p className="text-2xl font-bold text-gray-900">{data?.pendingTasks || 0}</p>
-            </div>
-            <Clock className="h-8 w-8 text-orange-500" />
-          </div>
-        </div>
+      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Open Leads" value={overview.totalLeads ?? 0} icon={Users} accent="gold" hint={`${overview.newLeadsToday ?? 0} new today`} />
+        <StatCard label="Students" value={overview.totalStudents ?? 0} icon={GraduationCap} accent="pine" hint={`${overview.activeStudents ?? 0} active`} />
+        <StatCard label="Lead Momentum" value={overview.newLeadsToday ?? 0} icon={TrendingUp} accent="ember" hint="new today" />
+        <StatCard label="Follow-ups" value={recentLeads.length} icon={CalendarClock} accent="walnut" hint="recent leads" />
       </div>
 
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
-          {recentActivity.length > 0 ? (
-            <div className="space-y-3">
-              {recentActivity.map((activity, index) => (
-                <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-md">
-                  <AlertCircle className="h-5 w-5 text-gray-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                    <p className="text-xs text-gray-500">{activity.description}</p>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] shadow-[var(--shadow-card)]">
+          <div className="border-b border-[var(--color-line)] px-5 py-4">
+            <h2 className="font-semibold text-[var(--color-walnut)]">Recent Leads</h2>
+          </div>
+          <div className="max-h-[360px] divide-y divide-[var(--color-line)] overflow-y-auto">
+            {recentLeads.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-[var(--color-muted)]">No recent leads.</p>
+            ) : (
+              recentLeads.map((lead) => (
+                <div key={String(lead._id)} className="flex items-center justify-between gap-3 px-5 py-3.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-[var(--color-walnut)]">{String(lead.studentName || "Unnamed lead")}</p>
+                    <p className="truncate text-xs text-[var(--color-muted)]">{String(lead.email || "")}</p>
                   </div>
+                  <StatusBadge status={String(lead.status || "new")} />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">No recent activity</p>
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        </section>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Today's Schedule</h3>
-          {todaySchedule.length > 0 ? (
-            <div className="space-y-3">
-              {todaySchedule.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{item.title}</p>
-                    <p className="text-xs text-gray-500">{item.time}</p>
+        <section className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] shadow-[var(--shadow-card)]">
+          <div className="border-b border-[var(--color-line)] px-5 py-4">
+            <h2 className="font-semibold text-[var(--color-walnut)]">Recent Students</h2>
+          </div>
+          <div className="max-h-[360px] divide-y divide-[var(--color-line)] overflow-y-auto">
+            {recentStudents.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-[var(--color-muted)]">No recent students.</p>
+            ) : (
+              recentStudents.map((student) => (
+                <div key={String(student._id)} className="flex items-center justify-between gap-3 px-5 py-3.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-[var(--color-walnut)]">{String(student.studentName || "Unnamed student")}</p>
+                    <p className="truncate text-xs text-[var(--color-muted)]">{String(student.email || "")}</p>
                   </div>
-                  <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                    {item.status}
-                  </span>
+                  <StatusBadge status={String(student.studentStatus || "active")} />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">No classes scheduled for today</p>
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
