@@ -12,8 +12,10 @@ import CoachCard from "@/components/shared/CoachCard";
 import LaurelWreath from "@/components/shared/LaurelWreath";
 import { COACHES } from "@/data/coaches";
 import type { StudentSpotlight, Prodigy } from "@/types";
+import type { Coach } from "@/components/shared/CoachCard";
 import { getProdigies } from "@/lib/api";
 import { useState, useEffect } from "react";
+import CoachModal from "@/components/shared/CoachModal";
 
 // ─── FALLBACK DATA ─────────────────────────────────────────────────────────────
 
@@ -67,6 +69,7 @@ const fallbackProdigies: Prodigy[] = [
 export default function ProdigiesPage() {
   const [spotlightStudent, setSpotlightStudent] = useState<StudentSpotlight>(fallbackSpotlight);
   const [prodigiesList, setProdigiesList] = useState<Prodigy[]>(fallbackProdigies);
+  const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
 
   useEffect(() => {
     getProdigies()
@@ -272,9 +275,21 @@ export default function ProdigiesPage() {
             className="grid md:grid-cols-3 gap-8"
           >
             {COACHES.map((coach, i) => (
-              <CoachCard key={coach.name} coach={coach} index={i} />
+              <CoachCard 
+                key={coach.name} 
+                coach={coach} 
+                index={i} 
+                variant="default"
+                onClick={() => setSelectedCoach(coach)}
+              />
             ))}
           </motion.div>
+
+          <CoachModal 
+            coach={selectedCoach}
+            isOpen={!!selectedCoach}
+            onClose={() => setSelectedCoach(null)}
+          />
 
           {/* Philosophy strip */}
           <motion.div

@@ -36,13 +36,13 @@ export const COACHES: Coach[] = [
     ],
   },
    {
-    name: "Manish Yadav",
+    name: "Rahul Sharma",
     title: "International Rated Player",
     experience: "5+ Years",
     speciality: "Tactical Training",
     description:
       "3 times state champion and rank holder with exceptional competitive record across multiple age categories. Manish brings proven tournament experience and tactical expertise to develop young champions.",
-    image: "https://res.cloudinary.com/aaa97ofg/image/upload/v1783288915/chess-academy/manish2.png",
+    image: "https://res.cloudinary.com/aaa97ofg/image/upload/v1783791354/Screenshot_2026-07-11_at_11.04.26_PM_zlj4rw.png",
     achievements: [
       "U14 State Champion",
       "U15 - 2nd State",
