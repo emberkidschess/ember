@@ -1,4 +1,4 @@
-// Environment variables are provided by Render in production
+// Environment variables are provided by MilesWeb in production
 import dotenv from 'dotenv';
 dotenv.config();
 

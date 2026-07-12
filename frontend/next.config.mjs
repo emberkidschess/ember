@@ -43,7 +43,7 @@ const nextConfig = {
               "img-src 'self' data: blob: https://res.cloudinary.com https://images.unsplash.com",
               "media-src 'self' https://res.cloudinary.com",
               "font-src 'self' data:",
-              `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, '') || "http://localhost:5001"} https://www.instagram.com`,
+              `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, '') || "http://localhost:5001"} https://api.emberkidschess.com https://www.instagram.com`,
               "frame-src 'self' https://www.instagram.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
