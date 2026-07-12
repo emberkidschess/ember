@@ -33,7 +33,7 @@ export default function ContactPage() {
   const hasPhone = Boolean(profile?.phone && profile.phoneHref?.startsWith("tel:"));
   const hasWhatsapp = Boolean(profile?.whatsappHref?.startsWith("https://"));
   const contactItems: ContactItem[] = [
-    { icon: Mail, title: "Email", info: profile?.email || "hello@emberkids.com" },
+    { icon: Mail, title: "Email", info: profile?.email || "hello@emberkidschess.com" },
     ...(hasPhone ? [{ icon: Phone, title: "Phone", info: profile!.phone }] : []),
     ...(hasWhatsapp ? [{ icon: MessageSquare, title: "WhatsApp", info: profile?.supportLine || "Chat with us on WhatsApp" }] : []),
   ];

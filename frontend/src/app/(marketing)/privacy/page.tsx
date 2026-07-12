@@ -99,7 +99,7 @@ export default function PrivacyPolicy() {
               If you have any questions about this Privacy Policy or our data practices, please contact us at:
             </p>
             <p className="text-[var(--color-muted)] leading-relaxed mt-2">
-              Email: hello@emberkids.com
+              Email: hello@emberkidschess.com
             </p>
           </section>
         </div>

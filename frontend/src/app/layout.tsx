@@ -22,7 +22,7 @@ const dmSans = DM_Sans({
 
 // ─── SEO Metadata ──────────────────────────────────────────────────────────────
 
-const SITE_URL = "https://emberkids.com";
+const SITE_URL = "https://emberkidschess.com";
 const SITE_NAME = "EmberKids Chess Academy";
 const SITE_DESCRIPTION =
   "Structured chess coaching for children built around focus, confidence, and competitive tournament thinking. Trusted by 5000+ students across 20+ countries.";
@@ -68,7 +68,7 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     images: [
       {
-        url: "https://res.cloudinary.com/aaa97ofg/image/upload/v1783288892/chess-academy/hero.png",
+        url: "https://res.cloudinary.com/aaa97ofg/image/upload/v1783288889/chess-academy/fav.png",
         width: 1200,
         height: 630,
         alt: "EmberKids Chess Academy",
@@ -79,7 +79,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${SITE_NAME} — Where Grandmasters Begin`,
     description: SITE_DESCRIPTION,
-    images: ["https://res.cloudinary.com/aaa97ofg/image/upload/v1783288892/chess-academy/hero.png"],
+    images: ["https://res.cloudinary.com/aaa97ofg/image/upload/v1783288889/chess-academy/fav.png"],
     creator: "@emberkids",
   },
   icons: {
@@ -116,9 +116,15 @@ const jsonLd = {
   description: SITE_DESCRIPTION,
   url: SITE_URL,
   logo: "https://res.cloudinary.com/aaa97ofg/image/upload/v1783288889/chess-academy/fav.png",
+  telephone: "+91 88240 44647",
+  email: "hello@emberkidschess.com",
+  address: {
+    "@type": "PostalAddress",
+    addressCountry: "IN",
+  },
+  foundingDate: "2026",
   sameAs: [
     CANONICAL_INSTAGRAM_URL,
-    "#",
   ],
   offers: {
     "@type": "Offer",

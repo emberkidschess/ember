@@ -6,4 +6,4 @@ Disallow: /staff/
 Disallow: /student/
 Disallow: /api/
 
-Sitemap: https://emberkids.com/sitemap.xml
+Sitemap: https://emberkidschess.com/sitemap.xml

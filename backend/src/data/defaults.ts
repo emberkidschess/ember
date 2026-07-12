@@ -213,7 +213,7 @@ const defaultSiteProfile: SiteProfile = {
   fullName: 'Chess Academy International',
   tagline: 'Building champions, one move at a time',
   description: 'Premium online chess coaching for young minds.',
-  email: process.env.PUBLIC_CONTACT_EMAIL || 'hello@emberkids.com',
+  email: process.env.PUBLIC_CONTACT_EMAIL || 'hello@emberkidschess.com',
   phone: process.env.PUBLIC_CONTACT_PHONE || '+91 88240 44647',
   phoneHref: process.env.PUBLIC_CONTACT_PHONE_HREF || 'tel:+918824044647',
   whatsappHref: process.env.PUBLIC_WHATSAPP_URL || 'https://wa.me/918824044647',

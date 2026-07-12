@@ -12,7 +12,7 @@ export default function Footer() {
   const { siteConfig } = useSiteConfig();
   const profile = siteConfig?.profile;
 
-  const contactEmail = profile?.email || "hello@emberkids.com";
+  const contactEmail = profile?.email || "hello@emberkidschess.com";
   const contactPhone = profile?.phone;
   const contactPhoneHref = profile?.phoneHref;
   const contactWhatsappHref = profile?.whatsappHref;

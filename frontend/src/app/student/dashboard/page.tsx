@@ -1331,7 +1331,7 @@ export default function StudentDashboardPage() {
             {/* Quick Contact Cards */}
             <div className="grid gap-4 sm:grid-cols-2">
               <a
-                href="mailto:support@emberkids.com"
+                href="mailto:support@emberkidschess.com"
                 className="group flex items-center gap-4 rounded-xl border border-[#e5eae7] bg-white p-5 hover:border-[#e04a15] hover:shadow-md transition-all"
               >
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#f5e6e0] to-[#edd8d0] text-[#e04a15] group-hover:scale-110 transition-transform">
@@ -1339,7 +1339,7 @@ export default function StudentDashboardPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-[#17231f]">Email Us</p>
-                  <p className="text-sm text-[#75817c]">support@emberkids.com</p>
+                  <p className="text-sm text-[#75817c]">support@emberkidschess.com</p>
                 </div>
               </a>
               <a
