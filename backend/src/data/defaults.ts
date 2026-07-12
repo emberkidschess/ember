@@ -152,8 +152,9 @@ export const defaultTestimonials: Testimonial[] = [
   },
   {
     quote: 'Tournament preparation used to feel stressful. EmberKids made the process structured, practical, and encouraging for our child.',
-    name: 'Anita Desai',
-    role: 'Parent of Kabir, Age 12',
+    name: 'Vijay',
+    role: 'Parent of Balamithran, Age 11',
+    imageUrl: '/images/test3.jpeg',
     instagramUrl: 'https://www.instagram.com/reel/DaL7l31znf0/?utm_source=ig_web_copy_link&igsh=MzRlODBiNWFlZA==',
   },
   {

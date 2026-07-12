@@ -46,7 +46,7 @@ export default function TestimonialCard({ item, className = "" }: TestimonialCar
       ) : hasInstagram ? (
         <div className="absolute inset-0 z-0 bg-gray-800">
           <img
-            src="https://res.cloudinary.com/aaa97ofg/image/upload/v1783288892/chess-academy/hero.png"
+            src="/images/test3.jpeg"
             alt=""
             aria-hidden="true"
             loading="lazy"

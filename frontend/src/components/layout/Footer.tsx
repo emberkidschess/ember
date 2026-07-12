@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { FaFacebookF, FaInstagram, FaWhatsapp } from "react-icons/fa6";
-import { Mail, Phone, MapPin, ChevronRight } from "lucide-react";
+import { Mail, Phone, ChevronRight } from "lucide-react";
 import { useSiteConfig } from "@/lib/site";
 import { CANONICAL_INSTAGRAM_URL, getSocialHref } from "@/lib/socialLinks";
 
@@ -13,13 +13,13 @@ export default function Footer() {
   const profile = siteConfig?.profile;
 
   const contactEmail = profile?.email || "hello@emberkidschess.com";
+  const supportEmail = "support@emberkidschess.com";
   const contactPhone = profile?.phone;
   const contactPhoneHref = profile?.phoneHref;
   const contactWhatsappHref = profile?.whatsappHref;
   const instagramHref = getSocialHref(siteConfig?.socialLinks, "instagram", CANONICAL_INSTAGRAM_URL);
   const hasPhone = Boolean(contactPhone && contactPhoneHref?.startsWith("tel:"));
   const hasWhatsapp = Boolean(contactWhatsappHref?.startsWith("https://"));
-  const serviceArea = "Serving students across the US & Canada";
 
   return (
     <footer id="site-footer" className="bg-white text-[var(--color-muted)] border-t border-[var(--color-line)]" role="contentinfo">
@@ -86,13 +86,29 @@ export default function Footer() {
             <ul className="space-y-4 text-sm">
               <li className="flex items-start gap-3">
                 <Mail className="w-5 h-5 text-[var(--color-gold)] flex-shrink-0 mt-0.5" aria-hidden="true" />
-                <a
-                  href={`mailto:${contactEmail}`}
-                  className="hover:text-[var(--color-gold)] transition-colors"
-                  aria-label={`Send email to ${contactEmail}`}
-                >
-                  {contactEmail}
-                </a>
+                <div>
+                  <a
+                    href={`mailto:${contactEmail}`}
+                    className="hover:text-[var(--color-gold)] transition-colors font-medium"
+                    aria-label={`Send email to ${contactEmail}`}
+                  >
+                    {contactEmail}
+                  </a>
+                  <p className="text-xs text-[var(--color-muted)] mt-1">For general inquiries and admissions</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <Mail className="w-5 h-5 text-[var(--color-gold)] flex-shrink-0 mt-0.5" aria-hidden="true" />
+                <div>
+                  <a
+                    href={`mailto:${supportEmail}`}
+                    className="hover:text-[var(--color-gold)] transition-colors font-medium"
+                    aria-label={`Send email to ${supportEmail}`}
+                  >
+                    {supportEmail}
+                  </a>
+                  <p className="text-xs text-[var(--color-muted)] mt-1">For student support and technical help</p>
+                </div>
               </li>
               {hasPhone && (
                 <li className="flex items-start gap-3">
@@ -102,12 +118,6 @@ export default function Footer() {
                   </a>
                 </li>
               )}
-              <li className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-[var(--color-gold)] flex-shrink-0 mt-0.5" aria-hidden="true" />
-                <address className="text-[var(--color-muted)] not-italic">
-                  {serviceArea}
-                </address>
-              </li>
             </ul>
           </div>
 
