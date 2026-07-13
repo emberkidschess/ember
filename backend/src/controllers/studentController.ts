@@ -949,7 +949,7 @@ export const submitHelpRequest = async (req: ClientAuthRequest, res: Response) =
     }
 
     const emailService = (await import('../services/emailService')).default;
-    await emailService.sendTemplatedEmail('support@emberkidschess.com', 'help_request', {
+    await emailService.sendTemplatedEmail(process.env.SUPPORT_EMAIL || 'support@emberkidschess.com', 'help_request', {
       studentName: name,
       fromEmail: student.email,
       subject,

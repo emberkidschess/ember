@@ -36,6 +36,7 @@ const OPTIONAL_ENV_VARS = [
   'PUBLIC_CONTACT_PHONE_HREF',
   'PUBLIC_WHATSAPP_URL',
   'PUBLIC_INSTAGRAM_URL',
+  'SUPPORT_EMAIL',
 ];
 
 export function validateEnvVarsOnStart(): void {

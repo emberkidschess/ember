@@ -25,7 +25,7 @@ export default function InstagramVideoCard({ item, className = "" }: InstagramVi
     >
       <div className="absolute inset-0 z-0">
         <img
-          src="https://res.cloudinary.com/aaa97ofg/image/upload/v1783288892/chess-academy/hero.png"
+          src={item.imageUrl || "https://res.cloudinary.com/aaa97ofg/image/upload/v1783288892/chess-academy/hero.png"}
           alt=""
           aria-hidden="true"
           loading="lazy"

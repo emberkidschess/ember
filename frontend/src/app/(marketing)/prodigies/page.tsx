@@ -74,12 +74,10 @@ export default function ProdigiesPage() {
   useEffect(() => {
     getProdigies()
       .then((data) => {
-        console.log('Prodigies API response:', data);
         if (data.success && data.data) {
           setSpotlightStudent(data.data.spotlight);
           // Use fallback if prodigies array is empty
           setProdigiesList(data.data.prodigies.length > 0 ? data.data.prodigies : fallbackProdigies);
-          console.log('Prodigies list set:', data.data.prodigies.length > 0 ? data.data.prodigies : fallbackProdigies);
         }
       })
       .catch((error) => {
