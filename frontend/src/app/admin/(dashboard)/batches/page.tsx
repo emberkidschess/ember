@@ -48,7 +48,7 @@ const BATCH_STATUSES = ["upcoming", "ongoing", "completed"] as const;
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   upcoming: ["ongoing", "completed"],
   ongoing: ["completed", "upcoming"],
-  completed: ["ongoing"],
+  completed: [],
 };
 
 type BatchFormState = {
@@ -764,7 +764,7 @@ export default function BatchesPage() {
                   return (
                     <div key={id} className="flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--color-ivory)] text-sm">
                       <span className="text-[var(--color-walnut)]">{name}</span>
-                      {canManage && (
+                      {canManage && studentsTarget?.status !== "completed" && (
                         <button onClick={() => handleRemoveStudent(id)} className="text-[var(--color-ember-deep)] hover:opacity-80 p-1" title="Remove">
                           <UserMinus className="h-4 w-4" />
                         </button>
@@ -776,7 +776,13 @@ export default function BatchesPage() {
             )}
           </div>
 
-          {canManage && studentsNotInBatch.length > 0 && (
+          {studentsTarget?.status === "completed" && (
+            <p className="rounded-xl bg-[var(--color-ivory)] px-4 py-3 text-sm text-[var(--color-muted)]">
+              This completed batch roster is locked to preserve its class history.
+            </p>
+          )}
+
+          {canManage && studentsTarget?.status !== "completed" && studentsNotInBatch.length > 0 && (
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-muted)] mb-2">Add Students</p>
               <select

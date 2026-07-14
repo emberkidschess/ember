@@ -499,6 +499,12 @@ export const addStudentsToBatch = async (req: AuthRequest, res: Response) => {
     if (!batch) {
       return res.status(404).json({ success: false, error: 'Batch not found' });
     }
+    if (batch.status === BatchStatus.COMPLETED) {
+      return res.status(409).json({
+        success: false,
+        error: 'A completed batch roster is locked',
+      });
+    }
 
     await Promise.all(studentIds.map((id) => validateStudent(id)));
 
@@ -577,6 +583,12 @@ export const removeStudentFromBatch = async (req: AuthRequest, res: Response) =>
     const batch = await Batch.findById(req.params.id);
     if (!batch) {
       return res.status(404).json({ success: false, error: 'Batch not found' });
+    }
+    if (batch.status === BatchStatus.COMPLETED) {
+      return res.status(409).json({
+        success: false,
+        error: 'A completed batch roster is locked',
+      });
     }
 
     batch.students = batch.students.filter((id) => id.toString() !== studentId) as any;
