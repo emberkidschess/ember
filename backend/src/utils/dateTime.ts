@@ -58,9 +58,28 @@ export function classWindow(classData: {
   endTime: string;
   timezone: string;
 }): { startAt: Date; endAt: Date } {
+  const startAt = zonedDateTimeToUtc(classData.date, classData.startTime, classData.timezone);
+  let endAt = zonedDateTimeToUtc(classData.date, classData.endTime, classData.timezone);
+  if (classData.endTime <= classData.startTime) {
+    const nextDate = new Date(new Date(classData.date).getTime() + 24 * 60 * 60 * 1000);
+    endAt = zonedDateTimeToUtc(nextDate, classData.endTime, classData.timezone);
+  }
+  return { startAt, endAt };
+}
+
+export function classAccessWindow(classData: {
+  date: Date | string;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  accessOpensMinutesBefore?: number;
+}): { opensAt: Date; startAt: Date; closesAt: Date } {
+  const { startAt, endAt } = classWindow(classData);
+  const leadMinutes = Math.min(10, Math.max(5, classData.accessOpensMinutesBefore ?? 10));
   return {
-    startAt: zonedDateTimeToUtc(classData.date, classData.startTime, classData.timezone),
-    endAt: zonedDateTimeToUtc(classData.date, classData.endTime, classData.timezone),
+    opensAt: new Date(startAt.getTime() - leadMinutes * 60 * 1000),
+    startAt,
+    closesAt: endAt,
   };
 }
 

@@ -214,15 +214,15 @@ export default function BookFreeTrial({ isOpen, onClose }: BookFreeTrialProps) {
                 >
                   Phone
                 </label>
-                <div className="flex gap-2">
-                  <div className="relative shrink-0">
+                <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-[112px_minmax(0,1fr)]">
+                  <div className="relative">
                     <select
                       id={countryId}
                       name="country"
                       aria-label="Country"
                       value={formData.country}
                       onChange={(e) => handleCountrySelect(e.target.value as SupportedCountry)}
-                      className="h-[48px] pl-3 pr-7 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-[#D86B45] focus:ring-4 focus:ring-[#D86B45]/10 outline-none transition-all appearance-none text-base cursor-pointer text-[#1D1A17]"
+                      className="h-[48px] w-full pl-3 pr-7 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-[#D86B45] focus:ring-4 focus:ring-[#D86B45]/10 outline-none transition-all appearance-none text-base cursor-pointer text-[#1D1A17]"
                     >
                       {COUNTRY_OPTIONS.map((option) => (
                         <option key={option.code} value={option.code}>
@@ -233,7 +233,7 @@ export default function BookFreeTrial({ isOpen, onClose }: BookFreeTrialProps) {
                     <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                   </div>
 
-                  <div className="relative group flex-1">
+                  <div className="relative group min-w-0">
                     <Phone className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 w-[16px] h-[16px] sm:w-[18px] sm:h-[18px] text-gray-400 group-focus-within:text-[#D86B45] transition-colors" />
                     <input
                       id={phoneId}
@@ -255,7 +255,7 @@ export default function BookFreeTrial({ isOpen, onClose }: BookFreeTrialProps) {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div>
                 <div>
                   <label
                     htmlFor={ageId}

@@ -304,6 +304,25 @@ export interface Batch {
   schedule?: string;
   timezone?: string;
   startDate?: string;
+  automationEnabled?: boolean;
+  frequencyDays?: number[];
+  classStartTime?: string;
+  classDurationMinutes?: number;
+  meetingLink?: string;
+  whatsappCommunityLink?: string;
+  accessOpensMinutesBefore?: number;
+  nextUpcomingClass?: {
+    _id: string;
+    course: string;
+    classType: "regular" | "extra";
+    date: string;
+    startTime: string;
+    endTime: string;
+    timezone: string;
+    accessOpensAt: string;
+    startsAt: string;
+    accessClosesAt: string;
+  } | null;
   completedAt?: string;
   notes?: string;
   totalSessions: number;
@@ -343,12 +362,28 @@ export const removeStudentFromBatch = (id: string, studentId: string) =>
   adminFetchJSON<ApiItemResponse<Batch>>(`/batches/${id}/students/${studentId}`, { method: "DELETE" });
 export const deleteBatch = (id: string) =>
   adminFetchJSON<ApiItemResponse<null>>(`/batches/${id}`, { method: "DELETE" });
+export const createExtraClass = (
+  id: string,
+  payload: {
+    date: string;
+    startTime: string;
+    timezone: string;
+    durationMinutes: number;
+    meetingLink: string;
+    accessOpensMinutesBefore?: number;
+    reason?: string;
+  }
+) =>
+  adminFetchJSON<ApiItemResponse<ClassItem>>(`/batches/${id}/extra-classes`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 // ---------- Classes ----------
 
 export interface ClassItem {
   _id: string;
   students: { _id: string; studentName: string }[] | string[];
-  batch?: { _id: string; name: string } | string;
+  batch?: { _id: string; name: string; status?: string; schedule?: string; whatsappCommunityLink?: string } | string;
   coach: { _id: string; name: string } | string;
   course: string;
   date: string;
@@ -356,13 +391,19 @@ export interface ClassItem {
   endTime: string;
   timezone: string;
   meetingLink?: string;
-  classType: "regular" | "trial";
+  classType: "regular" | "extra" | "trial";
   status: string;
   notes?: string;
+  extraClassReason?: string;
+  accessOpensMinutesBefore?: number;
+  accessOpensAt?: string;
+  startsAt?: string;
+  accessClosesAt?: string;
+  canStart?: boolean;
   createdAt: string;
 }
 
-export const getClasses = (params?: { student?: string; batch?: string; coach?: string; page?: string | number; limit?: string | number }) =>
+export const getClasses = (params?: { status?: string; student?: string; batch?: string; coach?: string; page?: string | number; limit?: string | number }) =>
   adminFetchJSON<ApiListResponse<ClassItem>>(`/classes${toQueryString({ limit: 100, ...params })}`);
 
 export const getClass = (id: string) => adminFetchJSON<ApiItemResponse<ClassItem>>(`/classes/${id}`);

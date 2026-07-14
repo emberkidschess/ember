@@ -162,7 +162,7 @@ function getClassTimingStatus(classItem: UpcomingClass, now: Date | null) {
   if (now < opensAt) {
     return {
       label: `Opens in ${formatDurationLabel(opensAt, now)}`,
-      helper: "Your join button activates at class time",
+      helper: "Your Join Now button appears shortly before class",
       tone: "waiting" as const,
     };
   }
@@ -193,7 +193,7 @@ function getJoinState(
     return {
       enabled: false,
       label: `Starts ${formatTime(classItem.startTime)}`,
-      helper: "Join becomes available at the scheduled start time.",
+      helper: "Join Now appears 5–10 minutes before the scheduled start.",
     };
   }
   if (now > closesAt) {
@@ -276,6 +276,10 @@ function JoinButton({
   onJoin: (classItem: UpcomingClass) => void;
   compact?: boolean;
 }) {
+  if (!now || classItem.status !== "scheduled") return null;
+  const opensAt = new Date(classItem.joinOpensAt);
+  const closesAt = new Date(classItem.joinClosesAt);
+  if (now < opensAt || now > closesAt) return null;
   const state = getJoinState(classItem, now, portalLimited);
   return (
     <button
@@ -345,10 +349,21 @@ export default function StudentDashboardPage() {
   const [submittingHelp, setSubmittingHelp] = useState(false);
 
   useEffect(() => {
-    setNow(new Date());
-    const timer = window.setInterval(() => setNow(new Date()), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
+    let timer: number | undefined;
+    const tick = () => {
+      const current = new Date();
+      setNow(current);
+      const boundaries = (dashboard?.upcomingClasses || [])
+        .flatMap((classItem) => [Date.parse(classItem.joinOpensAt), Date.parse(classItem.joinClosesAt)])
+        .filter((timestamp) => Number.isFinite(timestamp) && timestamp > current.getTime());
+      const nextBoundary = boundaries.length > 0 ? Math.min(...boundaries) : undefined;
+      timer = window.setTimeout(tick, nextBoundary
+        ? Math.min(30_000, Math.max(250, nextBoundary - current.getTime() + 50))
+        : 30_000);
+    };
+    tick();
+    return () => { if (timer) window.clearTimeout(timer); };
+  }, [dashboard]);
 
   useEffect(() => {
     const load = async () => {
@@ -595,6 +610,7 @@ export default function StudentDashboardPage() {
   const batchSessionsText = currentBatch?.totalSessions
     ? `${currentBatch.sessionsCompleted ?? 0}/${currentBatch.totalSessions}`
     : "Not assigned";
+  const whatsappGroupLink = currentBatch?.whatsappCommunityLink || student.whatsappCommunityLink;
   const visibleAttendance = showAllAttendance
     ? recentAttendance
     : recentAttendance.slice(0, 4);
@@ -1154,6 +1170,20 @@ export default function StudentDashboardPage() {
                         {currentBatch?.coach?.name || "Not assigned"}
                       </dd>
                     </div>
+                    <div className="col-span-2">
+                      <dt className="text-xs font-medium text-[#75817c]">Class schedule</dt>
+                      <dd className="mt-1 text-sm font-semibold">{currentBatch?.schedule || "Not assigned"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium text-[#75817c]">Batch status</dt>
+                      <dd className="mt-1 text-sm font-semibold">{titleCase(currentBatch?.status)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium text-[#75817c]">WhatsApp group</dt>
+                      <dd className="mt-1 text-sm font-semibold">
+                        {whatsappGroupLink ? <a href={whatsappGroupLink} target="_blank" rel="noreferrer" className="text-[#e04a15] hover:underline">Open group</a> : "Not available"}
+                      </dd>
+                    </div>
                   </dl>
                 </div>
               ) : (
@@ -1343,7 +1373,7 @@ export default function StudentDashboardPage() {
                 </div>
               </a>
               <a
-                href="https://wa.me/1234567890"
+                href={whatsappGroupLink || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex items-center gap-4 rounded-xl border border-[#e5eae7] bg-white p-5 hover:border-[#e04a15] hover:shadow-md transition-all"
@@ -1353,7 +1383,7 @@ export default function StudentDashboardPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-[#17231f]">WhatsApp</p>
-                  <p className="text-sm text-[#75817c]">Chat instantly</p>
+                  <p className="text-sm text-[#75817c]">{whatsappGroupLink ? "Open your batch group" : "Group link not available"}</p>
                 </div>
               </a>
             </div>
@@ -1430,7 +1460,7 @@ export default function StudentDashboardPage() {
                     <X className="h-4 w-4 text-[#75817c] transition-transform group-open:rotate-45" />
                   </summary>
                   <p className="mt-2 px-4 text-sm leading-6 text-[#68756f]">
-                    Go to the Classes section and click the "Join" button when your class is scheduled. The button will be active 15 minutes before the class starts.
+                    Go to the Classes section and click “Join Now”. It appears automatically 5–10 minutes before class and disappears when the selected class duration ends.
                   </p>
                 </details>
                 <details className="group">

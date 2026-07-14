@@ -278,23 +278,26 @@ export default function StudentsPage() {
             </FormField>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="space-y-4">
             <FormField label="Email" required>
               <input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputClass} />
             </FormField>
             <FormField label="Phone" required>
-              <div className="flex gap-2">
-                <select value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value as "US" | "CA" | "IN" | "SA" | "AE" | "QA" | "KW" | "BH" | "OM" })} className={selectClass + " w-[90px] shrink-0"}>
+              <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-[112px_minmax(0,1fr)]">
+                <select value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value as "US" | "CA" | "IN" | "SA" | "AE" | "QA" | "KW" | "BH" | "OM" })} className={selectClass} aria-label="Country code">
                   {COUNTRY_OPTIONS.map((c) => (
                     <option key={c.code} value={c.code}>{c.flag} {c.dialCode}</option>
                   ))}
                 </select>
                 <input
                   required
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   value={form.phoneNumber}
                   onChange={(e) => setForm({ ...form, phoneNumber: formatPhoneInput(e.target.value, form.country) })}
                   placeholder="(555) 123-4567"
-                  className={inputClass}
+                  className={`${inputClass} min-w-0`}
                 />
               </div>
             </FormField>

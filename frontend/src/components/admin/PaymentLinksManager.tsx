@@ -510,7 +510,7 @@ function PaymentLinksContent() {
             </FormField>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Amount" required>
               <input required type="number" min={1} value={createForm.amount} onChange={(e) => setCreateForm({ ...createForm, amount: e.target.value })} className={inputClass} />
             </FormField>
@@ -533,7 +533,7 @@ function PaymentLinksContent() {
             </FormField>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Session Plan" required>
               <select
                 required

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Search, Calendar, Clock, CheckCircle } from "lucide-react";
+import { Loader2, Search, Calendar, Clock, CheckCircle, Video, MessageCircle } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { getClasses, type ClassItem } from "@/lib/adminApi";
@@ -15,7 +15,18 @@ function getClassDuration(startTime: string, endTime: string) {
   const [startHour = 0, startMinute = 0] = startTime.split(":").map(Number);
   const [endHour = 0, endMinute = 0] = endTime.split(":").map(Number);
   const minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
-  return minutes > 0 ? `${minutes} min` : "—";
+  const normalized = minutes <= 0 ? minutes + 24 * 60 : minutes;
+  return normalized > 0 ? `${normalized} min` : "—";
+}
+
+function StartClassButton({ cls, now }: { cls: ClassItem; now: Date }) {
+  if (!cls.accessOpensAt || !cls.accessClosesAt || !cls.meetingLink || cls.status !== "scheduled") return null;
+  if (now < new Date(cls.accessOpensAt) || now > new Date(cls.accessClosesAt)) return null;
+  return (
+    <a href={cls.meetingLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-ember)] px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+      <Video className="h-3.5 w-3.5" /> Start Now
+    </a>
+  );
 }
 
 export default function StaffClassesPage() {
@@ -23,11 +34,12 @@ export default function StaffClassesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [now, setNow] = useState(() => new Date());
 
   const load = async () => {
     setLoading(true);
     try {
-      const data = await getClasses();
+      const data = await getClasses({ status: "scheduled" });
       if (data.success) {
         setClasses(data.data || []);
       } else {
@@ -43,6 +55,25 @@ export default function StaffClassesPage() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    let timer: number | undefined;
+    const tick = () => {
+      const current = new Date();
+      setNow(current);
+      const boundaries = classes
+        .flatMap((classItem) => [classItem.accessOpensAt, classItem.accessClosesAt])
+        .filter((value): value is string => Boolean(value))
+        .map((value) => Date.parse(value))
+        .filter((timestamp) => Number.isFinite(timestamp) && timestamp > current.getTime());
+      const nextBoundary = boundaries.length > 0 ? Math.min(...boundaries) : undefined;
+      timer = window.setTimeout(tick, nextBoundary
+        ? Math.min(15_000, Math.max(250, nextBoundary - current.getTime() + 50))
+        : 15_000);
+    };
+    tick();
+    return () => { if (timer) window.clearTimeout(timer); };
+  }, [classes]);
 
   const filteredClasses = classes.filter(
     (cls) =>
@@ -93,6 +124,7 @@ export default function StaffClassesPage() {
               <th className="text-left">Date & Time</th>
               <th className="text-left">Duration</th>
               <th className="text-left">Status</th>
+              <th className="text-left">Live Access</th>
             </tr>
           </thead>
           <tbody>
@@ -109,12 +141,25 @@ export default function StaffClassesPage() {
                     <Clock className="h-4 w-4" />
                     {cls.startTime}–{cls.endTime} {cls.timezone}
                   </div>
+                  {cls.classType === "extra" && cls.extraClassReason && (
+                    <p className="mt-1 max-w-xs whitespace-normal text-xs text-[var(--color-muted)]">{cls.extraClassReason}</p>
+                  )}
                 </td>
                 <td className="whitespace-nowrap">{getClassDuration(cls.startTime, cls.endTime)}</td>
                 <td className="whitespace-nowrap">
                   <div className="flex items-center gap-2">
                     {cls.status === "completed" && <CheckCircle className="h-4 w-4 text-[var(--color-pine)]" />}
                     <StatusBadge status={cls.status} />
+                  </div>
+                </td>
+                <td className="whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <StartClassButton cls={cls} now={now} />
+                    {typeof cls.batch === "object" && cls.batch?.whatsappCommunityLink && (
+                      <a href={cls.batch.whatsappCommunityLink} target="_blank" rel="noreferrer" title="Open WhatsApp group" className="rounded-lg border border-[var(--color-line)] p-2 text-[var(--color-pine-deep)] hover:bg-[var(--color-ivory)]">
+                        <MessageCircle className="h-4 w-4" />
+                      </a>
+                    )}
                   </div>
                 </td>
               </tr>

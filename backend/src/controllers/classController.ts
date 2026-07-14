@@ -10,8 +10,9 @@ import { notifyClassScheduled, notifyClassRescheduled, notifyClassCancelled } fr
 import { buildAuditLogData } from '../middleware/auditLogger';
 import { sanitizeQueryParam, sanitizePaginationParams } from '../utils/validation';
 import { reversePackageConsumption } from './attendanceController';
-import { classWindow, SUPPORTED_TIMEZONES } from '../utils/dateTime';
+import { classAccessWindow, classWindow, SUPPORTED_TIMEZONES } from '../utils/dateTime';
 import { ensureBatchSessionPlan } from '../domain/courseEnrollment';
+import { classAccessDto } from '../services/batchSchedulingService';
 
 const TRIAL_RESULT_EARLY_GRACE_MINUTES = 10;
 const TRIAL_EXPIRY_DAYS = 14;
@@ -123,7 +124,7 @@ function normalizeTrialResultForLead(trialResult: TrialResult) {
 
 export const getClasses = async (req: AuthRequest, res: Response) => {
   try {
-    const { status, coach, student, dateFrom, dateTo, page = '1', limit = '20' } = req.query;
+    const { status, coach, student, batch, dateFrom, dateTo, page = '1', limit = '20' } = req.query;
     
     const filter: any = {};
     
@@ -132,8 +133,11 @@ export const getClasses = async (req: AuthRequest, res: Response) => {
     const sanitizedStudent = sanitizeQueryParam(student);
     
     if (sanitizedStatus) filter.status = sanitizedStatus;
-    if (sanitizedCoach) filter.coach = sanitizedCoach;
+    if (req.user?.role === 'coach') filter.coach = req.user.userId;
+    else if (sanitizedCoach) filter.coach = sanitizedCoach;
     if (sanitizedStudent) filter.students = sanitizedStudent;
+    const sanitizedBatch = sanitizeQueryParam(batch);
+    if (sanitizedBatch) filter.batch = sanitizedBatch;
     
     const sanitizedDateFrom = sanitizeQueryParam(dateFrom);
     const sanitizedDateTo = sanitizeQueryParam(dateTo);
@@ -151,6 +155,7 @@ export const getClasses = async (req: AuthRequest, res: Response) => {
       Class.find(filter)
         .populate('students', 'studentName parentName email phone')
         .populate('coach', 'name email')
+        .populate('batch', 'name status schedule whatsappCommunityLink')
         .populate('createdBy', 'name email')
         .sort({ date: 1, startTime: 1 })
         .skip(skip)
@@ -159,9 +164,22 @@ export const getClasses = async (req: AuthRequest, res: Response) => {
       Class.countDocuments(filter)
     ]);
 
+    const now = new Date();
+    const data = classes.map((classItem: any) => {
+      const access = classAccessDto(classItem, true);
+      return {
+        ...classItem,
+        ...access,
+        canStart:
+          classItem.status === ClassStatus.SCHEDULED &&
+          now >= new Date(access.accessOpensAt) &&
+          now <= new Date(access.accessClosesAt),
+      };
+    });
+
     res.json({
       success: true,
-      data: classes,
+      data,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -669,6 +687,9 @@ export const updateClass = async (req: AuthRequest, res: Response) => {
       req.body.recordingUploadedAt = new Date();
       req.body.recordingUploadedBy = req.user?.userId;
     }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'meetingLink')) {
+      req.body.meetingLinkSource = 'custom';
+    }
 
     const classData = await Class.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
@@ -886,7 +907,7 @@ export const getMyClasses = async (req: ClientAuthRequest, res: Response) => {
       // Student-facing DTO: do not expose the other students in the class,
       // internal scheduling fields, or meeting access while paused.
       data: classes.map((classItem: any) => {
-        const { startAt, endAt } = classWindow(classItem);
+        const { opensAt, startAt, closesAt } = classAccessWindow(classItem);
         return {
           _id: classItem._id.toString(),
           course: classItem.course,
@@ -900,8 +921,9 @@ export const getMyClasses = async (req: ClientAuthRequest, res: Response) => {
           classNotesPostedAt: classItem.classNotesPostedAt,
           hasMeetingLink:
             student.portalStatus === 'active' && Boolean(classItem.meetingLink),
-          joinOpensAt: startAt.toISOString(),
-          joinClosesAt: endAt.toISOString(),
+          joinOpensAt: opensAt.toISOString(),
+          startsAt: startAt.toISOString(),
+          joinClosesAt: closesAt.toISOString(),
           coach: classItem.coach
             ? { name: classItem.coach.name, email: classItem.coach.email }
             : undefined,
@@ -1414,25 +1436,26 @@ export const joinTrialClass = async (req: Request, res: Response) => {
  */
 export const getClassJoinStatus = async (req: Request, res: Response) => {
   try {
-    const classData = await Class.findById(req.params.id).select('date startTime endTime timezone status classType');
+    const classData = await Class.findById(req.params.id).select('date startTime endTime timezone status classType accessOpensMinutesBefore');
     if (!classData) {
       return res.status(404).json({ success: false, error: 'Class not found' });
     }
 
     const now = new Date();
-    const { startAt, endAt } = classWindow(classData);
+    const { opensAt, startAt, closesAt } = classAccessWindow(classData);
 
-    const canJoin = now >= startAt && now <= endAt && classData.status === 'scheduled';
-    const hasEnded = now > endAt;
+    const canJoin = now >= opensAt && now <= closesAt && classData.status === 'scheduled';
+    const hasEnded = now > closesAt;
 
     res.json({
       success: true,
       data: {
         canJoin,
         hasEnded,
+        opensAt,
         startsAt: startAt,
-        endsAt: endAt,
-        secondsUntilStart: canJoin ? 0 : Math.max(0, Math.floor((startAt.getTime() - now.getTime()) / 1000)),
+        endsAt: closesAt,
+        secondsUntilOpen: canJoin ? 0 : Math.max(0, Math.floor((opensAt.getTime() - now.getTime()) / 1000)),
       },
     });
   } catch (error: any) {

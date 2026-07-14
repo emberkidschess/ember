@@ -51,6 +51,10 @@ export interface StudentDashboardData {
     sessionsCompleted?: number;
     schedule?: string;
     timezone?: string;
+    whatsappCommunityLink?: string;
+    classStartTime?: string;
+    classDurationMinutes?: number;
+    accessOpensMinutesBefore?: number;
     coach?: { name: string };
   } | null;
   packageHistory: {
@@ -72,7 +76,9 @@ export interface StudentDashboardData {
     endTime: string;
     timezone?: string;
     hasMeetingLink: boolean;
+    status: string;
     joinOpensAt: string;
+    startsAt: string;
     joinClosesAt: string;
     coach?: { name: string; email: string };
   }[];
@@ -108,6 +114,7 @@ export interface StudentClassItem {
   timezone?: string;
   hasMeetingLink: boolean;
   joinOpensAt: string;
+  startsAt: string;
   joinClosesAt: string;
   status: string;
   classNotes?: string;

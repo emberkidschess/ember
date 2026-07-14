@@ -1,5 +1,6 @@
 const { generateCSV } = require("../dist/utils/export");
-const { zonedDateTimeToUtc, localCalendarDateAsUtc } = require("../dist/utils/dateTime");
+const { zonedDateTimeToUtc, localCalendarDateAsUtc, classAccessWindow } = require("../dist/utils/dateTime");
+const { addMinutesToTime, buildRecurringClassDates, formatRecurringSchedule } = require("../dist/services/batchSchedulingService");
 const { BaseAuthService } = require("../dist/services/baseAuthService");
 const { requireAnyPermission } = require("../dist/middleware/auth");
 const { validateCSRFToken } = require("../dist/middleware/csrf");
@@ -11,6 +12,8 @@ const {
   markPaymentReceivedSchema,
   scheduleTrialClassSchema,
   markTrialResultSchema,
+  createBatchSchema,
+  createExtraClassSchema,
 } = require("../dist/utils/validation");
 const {
   COURSE_SESSION_TOTALS,
@@ -37,6 +40,43 @@ describe("critical domain utilities", () => {
     expect(
       localCalendarDateAsUtc("America/Los_Angeles", new Date("2026-07-04T02:00:00.000Z")).toISOString()
     ).toBe("2026-07-03T00:00:00.000Z");
+  });
+
+  test("recurring schedules keep selected weekdays and minute-precise times", () => {
+    const dates = buildRecurringClassDates("2026-07-13", [1, 5], 6).map((date) => date.toISOString().slice(0, 10));
+    expect(dates).toEqual(["2026-07-13", "2026-07-17", "2026-07-20", "2026-07-24", "2026-07-27", "2026-07-31"]);
+    expect(addMinutesToTime("17:30", 90)).toBe("19:00");
+    expect(formatRecurringSchedule([1, 5], "17:30", "Asia/Kolkata")).toBe("Every Monday & Friday · 5:30 PM · Asia/Kolkata");
+  });
+
+  test("access windows open early and duration can cross midnight safely", () => {
+    const window = classAccessWindow({
+      date: "2026-07-20",
+      startTime: "23:30",
+      endTime: addMinutesToTime("23:30", 90),
+      timezone: "Asia/Kolkata",
+      accessOpensMinutesBefore: 5,
+    });
+    expect(window.startAt.getTime() - window.opensAt.getTime()).toBe(5 * 60 * 1000);
+    expect(window.closesAt.getTime() - window.startAt.getTime()).toBe(90 * 60 * 1000);
+  });
+
+  test("automated batch and extra-class contracts require complete scheduling data", () => {
+    const automatedBatch = {
+      name: "Evening Batch", courseLevel: "Beginner", coach: "507f1f77bcf86cd799439012",
+      frequencyDays: [1, 5], classStartTime: "17:30", classDurationMinutes: 90,
+      accessOpensMinutesBefore: 10, timezone: "Asia/Kolkata", startDate: "2026-07-20",
+      meetingLink: "https://meet.example.com/evening",
+      whatsappCommunityLink: "https://chat.whatsapp.com/example",
+    };
+    expect(createBatchSchema.safeParse(automatedBatch).success).toBe(true);
+    expect(createBatchSchema.safeParse({ ...automatedBatch, frequencyDays: [] }).success).toBe(false);
+    expect(createBatchSchema.safeParse({ ...automatedBatch, meetingLink: "" }).success).toBe(false);
+    expect(createBatchSchema.safeParse({ ...automatedBatch, classStartTime: "17:05" }).success).toBe(true);
+    expect(createExtraClassSchema.safeParse({
+      date: "2026-07-21", startTime: "10:05", timezone: "Asia/Kolkata",
+      durationMinutes: 120, meetingLink: "https://meet.example.com/revision", reason: "Revision",
+    }).success).toBe(true);
   });
 
   test("payment-link input contracts keep payment method system-controlled", () => {

@@ -21,17 +21,12 @@ export const markAbsentees = async (): Promise<void> => {
   try {
     const now = new Date();
 
-    // Find classes that have ended (today or earlier) and are still
-    // scheduled/completed but might have unmarked attendance. We look back
-    // up to 2 days to catch anything a prior run might have missed (e.g.
-    // if the server was briefly down), without scanning the whole history
-    // every run.
-    const lookbackStart = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-
+    // No look-back cutoff: after an outage, the next run catches every
+    // scheduled class that should already have closed.
     const candidateClasses = await Class.find({
-      date: { $gte: lookbackStart, $lte: now },
-      classType: 'regular',
-      status: { $ne: 'cancelled' },
+      date: { $lte: now },
+      classType: { $in: ['regular', 'extra'] },
+      status: ClassStatus.SCHEDULED,
     }).select('_id date startTime endTime timezone').lean();
 
     if (candidateClasses.length === 0) return;
@@ -47,6 +42,7 @@ export const markAbsentees = async (): Promise<void> => {
     if (endedClassIds.length === 0) return;
 
     let markedAbsent = 0;
+    const touchedBatchIds = new Set<string>();
     for (const classId of endedClassIds) {
       const session = await mongoose.startSession();
       let triggerInfo: Awaited<ReturnType<typeof finalizeClassBatchProgress>> = {};
@@ -76,11 +72,22 @@ export const markAbsentees = async (): Promise<void> => {
       }
 
       if (triggerInfo.batchId) {
+        touchedBatchIds.add(triggerInfo.batchId);
         await fireBatchTriggerNotifications(
           triggerInfo.batchId,
           !!triggerInfo.batchJustCompleted
         );
       }
+    }
+
+    if (touchedBatchIds.size > 0) {
+      const { CacheService, CacheNamespaces } = await import('../utils/cache');
+      await CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`);
+      await Promise.all(
+        [...touchedBatchIds].map((batchId) =>
+          CacheService.delete(`${CacheNamespaces.BATCH_DETAILS}:${batchId}`)
+        )
+      );
     }
 
     logger.info(

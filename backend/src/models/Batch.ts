@@ -20,6 +20,12 @@ export interface IBatch extends Document {
   schedule?: string;
   timezone?: string;
   startDate?: Date;
+  automationEnabled: boolean;
+  frequencyDays?: number[];
+  classStartTime?: string;
+  classDurationMinutes?: number;
+  meetingLink?: string;
+  accessOpensMinutesBefore?: number;
   completedAt?: Date;
   notes?: string;
   whatsappCommunityLink?: string;
@@ -78,6 +84,42 @@ const BatchSchema: Schema = new Schema(
     startDate: {
       type: Date,
     },
+    automationEnabled: {
+      type: Boolean,
+      default: false,
+      required: true,
+      index: true,
+    },
+    frequencyDays: {
+      type: [Number],
+      default: undefined,
+      validate: {
+        validator: (days: number[] | undefined) =>
+          days === undefined ||
+          (days.length > 0 && days.length <= 7 && new Set(days).size === days.length &&
+            days.every((day) => Number.isInteger(day) && day >= 0 && day <= 6)),
+        message: 'Frequency days must contain unique weekday numbers from 0 to 6',
+      },
+    },
+    classStartTime: {
+      type: String,
+      match: /^([01]\d|2[0-3]):[0-5]\d$/,
+    },
+    classDurationMinutes: {
+      type: Number,
+      min: 15,
+      max: 480,
+    },
+    meetingLink: {
+      type: String,
+      trim: true,
+    },
+    accessOpensMinutesBefore: {
+      type: Number,
+      min: 5,
+      max: 10,
+      default: 10,
+    },
     completedAt: {
       type: Date,
     },
@@ -128,6 +170,7 @@ BatchSchema.index({ courseLevel: 1, name: 1 }, { unique: true });
 BatchSchema.index({ status: 1, courseLevel: 1 });
 BatchSchema.index({ coach: 1, status: 1 });
 BatchSchema.index({ status: 1, completedAt: -1 });
+BatchSchema.index({ automationEnabled: 1, status: 1, startDate: 1 });
 BatchSchema.index({ createdAt: -1 });
 
 BatchSchema.pre('validate', function(next) {

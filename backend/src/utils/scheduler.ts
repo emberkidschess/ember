@@ -5,7 +5,9 @@ let scheduledTasks: ScheduledTask[] = [];
 
 async function runMarkAbsentees(): Promise<void> {
   try {
+    const { startEligibleAutomatedBatches } = await import('../services/batchSchedulingService');
     const { markAbsentees } = await import('../scripts/markAbsentees');
+    await startEligibleAutomatedBatches();
     await markAbsentees();
   } catch (error) {
     logger.error('markAbsentees scheduler error:', error);
@@ -40,11 +42,9 @@ async function runNotificationRetry(): Promise<void> {
 }
 
 export function initializeSchedulers(): void {
-  // Auto-absent: "if they do not click Join Now by the end of the class,
-  // a scheduled backend job automatically marks them Absent." Runs every
-  // 5 minutes so the gap between a class ending and its attendance being
-  // finalized stays small.
-  scheduledTasks.push(cron.schedule('*/5 * * * *', runMarkAbsentees));
+  // Button visibility uses exact timestamps; this heartbeat persists class
+  // and batch lifecycle changes without requiring manual intervention.
+  scheduledTasks.push(cron.schedule('* * * * *', runMarkAbsentees));
 
   // Enrollment safety sweep. Attendance applies session exhaustion
   // immediately; this daily task catches interrupted or legacy records.
@@ -56,7 +56,7 @@ export function initializeSchedulers(): void {
   // Retry failed notification deliveries
   scheduledTasks.push(cron.schedule('*/30 * * * *', runNotificationRetry));
 
-  logger.info('Schedulers initialized: markAbsentees (5m), enrollmentExpiry (daily 9am), trialClassCheck (30m), notificationRetry (30m)');
+  logger.info('Schedulers initialized: batchLifecycle (1m), enrollmentExpiry (daily 9am), trialClassCheck (30m), notificationRetry (30m)');
 }
 
 export function stopSchedulers(): void {

@@ -5,7 +5,7 @@
 import { useEffect, useState, useMemo } from "react";
 import {
   Plus, Pencil, Trash2, Loader2, Search, Users, ArrowRight,
-  UserMinus, UserPlus, ChevronDown
+  UserMinus, UserPlus, ChevronDown, CalendarPlus, ExternalLink, MessageCircle
 } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import StatusBadge from "@/components/admin/StatusBadge";
@@ -28,6 +28,7 @@ import {
   addStudentsToBatch,
   removeStudentFromBatch,
   deleteBatch,
+  createExtraClass,
   getStaffList,
   getStudents,
   type Batch,
@@ -55,8 +56,14 @@ type BatchFormState = {
   courseLevel: string;
   coach: string;
   students: string[];
-  schedule: string;
+  frequencyDays: number[];
+  classStartTime: string;
+  timezone: string;
+  durationValue: string;
+  durationUnit: "minutes" | "hours";
+  accessOpensMinutesBefore: number;
   startDate: string;
+  meetingLink: string;
   notes: string;
   whatsappCommunityLink: string;
 };
@@ -66,11 +73,64 @@ const EMPTY_FORM: BatchFormState = {
   courseLevel: "Beginner",
   coach: "",
   students: [],
-  schedule: "",
+  frequencyDays: [],
+  classStartTime: "",
+  timezone: "Asia/Kolkata",
+  durationValue: "60",
+  durationUnit: "minutes",
+  accessOpensMinutesBefore: 10,
   startDate: "",
+  meetingLink: "",
   notes: "",
   whatsappCommunityLink: "",
 };
+
+const WEEKDAYS = [
+  { value: 1, label: "Mon" }, { value: 2, label: "Tue" }, { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" }, { value: 5, label: "Fri" }, { value: 6, label: "Sat" },
+  { value: 0, label: "Sun" },
+];
+
+const TIMEZONES = [
+  "Asia/Kolkata", "America/New_York", "America/Chicago", "America/Denver",
+  "America/Los_Angeles", "America/Toronto", "America/Vancouver", "Asia/Riyadh",
+  "Asia/Dubai", "Asia/Qatar", "Asia/Kuwait", "Asia/Bahrain", "Asia/Muscat",
+];
+
+type ExtraClassForm = {
+  date: string;
+  startTime: string;
+  timezone: string;
+  durationValue: string;
+  durationUnit: "minutes" | "hours";
+  meetingLink: string;
+  reason: string;
+};
+
+const EMPTY_EXTRA_FORM: ExtraClassForm = {
+  date: "", startTime: "", timezone: "Asia/Kolkata", durationValue: "60",
+  durationUnit: "minutes", meetingLink: "", reason: "",
+};
+
+function durationInMinutes(value: string, unit: "minutes" | "hours") {
+  const numeric = Number(value);
+  return Math.round(unit === "hours" ? numeric * 60 : numeric);
+}
+
+function DurationPicker({ value, unit, onChange }: {
+  value: string;
+  unit: "minutes" | "hours";
+  onChange: (value: string, unit: "minutes" | "hours") => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-[minmax(0,1fr)_130px]">
+      <input required type="number" min={unit === "hours" ? 0.25 : 15} max={unit === "hours" ? 8 : 480} step={unit === "hours" ? 0.25 : 1} value={value} onChange={(e) => onChange(e.target.value, unit)} className={inputClass} />
+      <select value={unit} onChange={(e) => onChange(value, e.target.value as "minutes" | "hours")} className={selectClass}>
+        <option value="minutes">Minutes</option><option value="hours">Hours</option>
+      </select>
+    </div>
+  );
+}
 
 export default function BatchesPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -91,7 +151,7 @@ export default function BatchesPage() {
   const [renameSaving, setRenameSaving] = useState(false);
 
   const [editTarget, setEditTarget] = useState<Batch | null>(null);
-  const [editForm, setEditForm] = useState({ coach: "", schedule: "", notes: "" });
+  const [editForm, setEditForm] = useState({ coach: "", meetingLink: "", whatsappCommunityLink: "", notes: "" });
   const [editSaving, setEditSaving] = useState(false);
 
   const [statusTarget, setStatusTarget] = useState<Batch | null>(null);
@@ -103,6 +163,10 @@ export default function BatchesPage() {
   const [studentSaving, setStudentSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<Batch | null>(null);
+  const [extraTarget, setExtraTarget] = useState<Batch | null>(null);
+  const [extraForm, setExtraForm] = useState<ExtraClassForm>(EMPTY_EXTRA_FORM);
+  const [extraSaving, setExtraSaving] = useState(false);
+  const [extraError, setExtraError] = useState("");
 
   const canManage = hasPermission("create_edit_class");
 
@@ -125,6 +189,12 @@ export default function BatchesPage() {
     }
   };
 
+  const reloadBatches = async () => {
+    const response = await getBatches();
+    if (response.success) setBatches(response.data);
+    else setError(response.error || "Failed to refresh batches");
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -144,22 +214,38 @@ export default function BatchesPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
+    if (form.frequencyDays.length === 0) {
+      setFormError("Select at least one weekday for the recurring schedule.");
+      return;
+    }
+    const classDurationMinutes = durationInMinutes(form.durationValue, form.durationUnit);
+    if (classDurationMinutes < 15 || classDurationMinutes > 480) {
+      setFormError("Class duration must be between 15 minutes and 8 hours.");
+      return;
+    }
     setSaving(true);
     try {
        
       const payload: any = {
-        ...form,
+        name: form.name,
         courseLevel: form.courseLevel,
+        coach: form.coach,
         students: form.students.length > 0 ? form.students : undefined,
-        startDate: form.startDate || undefined,
-        schedule: form.schedule || undefined,
+        frequencyDays: form.frequencyDays,
+        classStartTime: form.classStartTime,
+        timezone: form.timezone,
+        classDurationMinutes,
+        accessOpensMinutesBefore: form.accessOpensMinutesBefore,
+        startDate: form.startDate,
+        meetingLink: form.meetingLink,
+        whatsappCommunityLink: form.whatsappCommunityLink,
         notes: form.notes || undefined,
       };
       const res = await createBatch(payload);
       if (res.success) {
         setCreateOpen(false);
         setForm(EMPTY_FORM);
-        loadData();
+        await reloadBatches();
       } else {
         setFormError(res.error || "Failed to create batch");
       }
@@ -178,7 +264,7 @@ export default function BatchesPage() {
       const res = await renameBatch(renameTarget._id, renameForm.name, renameForm.courseLevel || undefined);
       if (res.success) {
         setRenameTarget(null);
-        loadData();
+        await reloadBatches();
       }
     } finally {
       setRenameSaving(false);
@@ -192,15 +278,45 @@ export default function BatchesPage() {
     try {
       const res = await updateBatch(editTarget._id, {
         coach: editForm.coach || undefined,
-        schedule: editForm.schedule || undefined,
+        meetingLink: editForm.meetingLink || undefined,
+        whatsappCommunityLink: editForm.whatsappCommunityLink || undefined,
         notes: editForm.notes || undefined,
       });
       if (res.success) {
         setEditTarget(null);
-        loadData();
+        await reloadBatches();
       }
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  const handleExtraClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!extraTarget) return;
+    setExtraSaving(true);
+    setExtraError("");
+    try {
+      const response = await createExtraClass(extraTarget._id, {
+        date: extraForm.date,
+        startTime: extraForm.startTime,
+        timezone: extraForm.timezone,
+        durationMinutes: durationInMinutes(extraForm.durationValue, extraForm.durationUnit),
+        meetingLink: extraForm.meetingLink,
+        reason: extraForm.reason || undefined,
+        accessOpensMinutesBefore: extraTarget.accessOpensMinutesBefore || 10,
+      });
+      if (!response.success) {
+        setExtraError(response.error || "Failed to schedule extra class");
+        return;
+      }
+      setExtraTarget(null);
+      setExtraForm(EMPTY_EXTRA_FORM);
+      await reloadBatches();
+    } catch (error) {
+      setExtraError(error instanceof Error ? error.message : "Could not connect to the server.");
+    } finally {
+      setExtraSaving(false);
     }
   };
 
@@ -211,7 +327,7 @@ export default function BatchesPage() {
       const res = await updateBatchStatus(statusTarget._id, newStatus);
       if (res.success) {
         setStatusTarget(null);
-        loadData();
+        await reloadBatches();
       }
     } finally {
       setStatusSaving(false);
@@ -225,13 +341,9 @@ export default function BatchesPage() {
       const res = await addStudentsToBatch(studentsTarget._id, addStudentIds);
       if (res.success) {
         setAddStudentIds([]);
-        loadData();
-        // update studentsTarget with fresh data
-        const updated = await getBatches();
-        if (updated.success) {
-          const fresh = updated.data.find((b) => b._id === studentsTarget._id);
-          if (fresh) setStudentsTarget(fresh);
-        }
+        const merged = { ...studentsTarget, students: res.data.students, studentCount: res.data.students.length };
+        setStudentsTarget(merged);
+        setBatches((current) => current.map((batch) => batch._id === merged._id ? merged : batch));
       }
     } finally {
       setStudentSaving(false);
@@ -243,12 +355,9 @@ export default function BatchesPage() {
     try {
       const res = await removeStudentFromBatch(studentsTarget._id, studentId);
       if (res.success) {
-        loadData();
-        const updated = await getBatches();
-        if (updated.success) {
-          const fresh = updated.data.find((b) => b._id === studentsTarget._id);
-          if (fresh) setStudentsTarget(fresh);
-        }
+        const merged = { ...studentsTarget, students: res.data.students, studentCount: res.data.students.length };
+        setStudentsTarget(merged);
+        setBatches((current) => current.map((batch) => batch._id === merged._id ? merged : batch));
       }
     } catch {
       /* ignore */
@@ -327,6 +436,7 @@ export default function BatchesPage() {
                 <th className="text-left">Batch</th>
                 <th className="text-left">Level</th>
                 <th className="text-left">Coach</th>
+                <th className="text-left">Next Class</th>
                 <th className="text-left">Students</th>
                 <th className="text-left">Course Sessions</th>
                 <th className="text-left">Status</th>
@@ -339,10 +449,17 @@ export default function BatchesPage() {
                     <td className="px-5 py-3.5">
                       <p className="font-medium text-[var(--color-walnut)]">{batch.name}</p>
                       {batch.schedule && <p className="text-xs text-[var(--color-muted)] mt-0.5">{batch.schedule}</p>}
+                      <div className="mt-1.5 flex flex-wrap gap-2 text-xs">
+                        {batch.meetingLink && <a href={batch.meetingLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--color-pine-deep)] hover:underline"><ExternalLink className="h-3 w-3" /> Meeting</a>}
+                        {batch.whatsappCommunityLink && <a href={batch.whatsappCommunityLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--color-pine-deep)] hover:underline"><MessageCircle className="h-3 w-3" /> WhatsApp</a>}
+                      </div>
                     </td>
                     <td className="px-5 py-3.5 text-[var(--color-walnut)]">{formatCourseLevel(batch.courseLevel)}</td>
                     <td className="px-5 py-3.5 text-[var(--color-walnut)]">
                       {typeof batch.coach === "object" ? batch.coach.name : "—"}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-[var(--color-walnut)]">
+                      {batch.nextUpcomingClass ? <><p>{new Date(batch.nextUpcomingClass.date).toLocaleDateString(undefined, { timeZone: "UTC" })}</p><p className="mt-0.5 text-[var(--color-muted)]">{batch.nextUpcomingClass.startTime} · {batch.nextUpcomingClass.timezone}</p></> : "—"}
                     </td>
                     <td className="px-5 py-3.5">
                       <button
@@ -398,7 +515,8 @@ export default function BatchesPage() {
                                 setEditTarget(batch);
                                 setEditForm({
                                   coach: typeof batch.coach === "object" ? batch.coach._id : "",
-                                  schedule: batch.schedule || "",
+                                  meetingLink: batch.meetingLink || "",
+                                  whatsappCommunityLink: batch.whatsappCommunityLink || "",
                                   notes: batch.notes || "",
                                 });
                               }}
@@ -407,16 +525,27 @@ export default function BatchesPage() {
                             >
                               <ArrowRight className="h-4 w-4" />
                             </button>
-                            <button
-                              onClick={() => {
-                                setStatusTarget(batch);
-                                setNewStatus(ALLOWED_TRANSITIONS[batch.status]?.[0] || "");
-                              }}
-                              title="Change status"
-                              className="text-[var(--color-muted)] hover:text-[var(--color-walnut)] p-1.5"
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </button>
+                            {batch.status !== "completed" && (
+                              <button onClick={() => {
+                                setExtraTarget(batch);
+                                setExtraForm({ ...EMPTY_EXTRA_FORM, timezone: batch.timezone || "Asia/Kolkata", meetingLink: batch.meetingLink || "" });
+                                setExtraError("");
+                              }} title="Schedule extra class" className="text-[var(--color-muted)] hover:text-[var(--color-walnut)] p-1.5">
+                                <CalendarPlus className="h-4 w-4" />
+                              </button>
+                            )}
+                            {batch.status !== "completed" && (
+                              <button
+                                onClick={() => {
+                                  setStatusTarget(batch);
+                                  setNewStatus(ALLOWED_TRANSITIONS[batch.status]?.[0] || "");
+                                }}
+                                title="Change status"
+                                className="text-[var(--color-muted)] hover:text-[var(--color-walnut)] p-1.5"
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </button>
+                            )}
                             <button
                               onClick={() => setDeleteTarget(batch)}
                               title="Delete"
@@ -467,14 +596,45 @@ export default function BatchesPage() {
             </select>
           </FormField>
 
+          <FormField label="Batch Frequency" required>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+              {WEEKDAYS.map((day) => {
+                const selected = form.frequencyDays.includes(day.value);
+                return <button key={day.value} type="button" aria-pressed={selected} onClick={() => setForm({
+                  ...form,
+                  frequencyDays: selected ? form.frequencyDays.filter((value) => value !== day.value) : [...form.frequencyDays, day.value],
+                })} className={`rounded-lg border px-2 py-2 text-xs font-semibold ${selected ? "border-[var(--color-pine)] bg-[var(--color-pine)] text-white" : "border-[var(--color-line)] bg-white text-[var(--color-walnut)]"}`}>{day.label}</button>;
+              })}
+            </div>
+            {form.frequencyDays.length === 0 && <p className="mt-1 text-xs text-[var(--color-muted)]">Select at least one class day.</p>}
+          </FormField>
+
           <div className="grid sm:grid-cols-2 gap-4">
-            <FormField label="Schedule">
-              <input value={form.schedule} onChange={(e) => setForm({ ...form, schedule: e.target.value })} className={inputClass} placeholder="e.g. Mon/Wed 5 PM" />
+            <FormField label="Start Date" required>
+              <input required type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className={inputClass} />
             </FormField>
-            <FormField label="Start Date">
-              <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className={inputClass} />
+            <FormField label="Class Start Time" required>
+              <input required type="time" step="60" value={form.classStartTime} onChange={(e) => setForm({ ...form, classStartTime: e.target.value })} className={inputClass} />
+              <p className="mt-1 text-xs text-[var(--color-muted)]">Minutes are supported, e.g. 10:05 AM or 5:30 PM.</p>
             </FormField>
           </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <FormField label="Time Zone" required>
+              <select required value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} className={selectClass}>
+                {TIMEZONES.map((timezone) => <option key={timezone} value={timezone}>{timezone}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Maximum Class Duration" required>
+              <DurationPicker value={form.durationValue} unit={form.durationUnit} onChange={(durationValue, durationUnit) => setForm({ ...form, durationValue, durationUnit })} />
+            </FormField>
+          </div>
+
+          <FormField label="Live Buttons Appear" required>
+            <select value={form.accessOpensMinutesBefore} onChange={(e) => setForm({ ...form, accessOpensMinutesBefore: Number(e.target.value) })} className={selectClass}>
+              <option value={5}>5 minutes before class</option><option value={10}>10 minutes before class</option>
+            </select>
+          </FormField>
 
           <FormField label="Initial Students">
             <select
@@ -492,8 +652,14 @@ export default function BatchesPage() {
             <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={textareaClass} rows={2} />
           </FormField>
 
-          <FormField label="WhatsApp Community Link">
+          <FormField label="Meeting Link" required>
+            <input required type="url" value={form.meetingLink} onChange={(e) => setForm({ ...form, meetingLink: e.target.value })} className={inputClass} placeholder="https://meet.google.com/..." />
+            <p className="text-xs text-[var(--color-muted)] mt-1">Used automatically for every recurring class unless that class is edited.</p>
+          </FormField>
+
+          <FormField label="WhatsApp Group Link" required>
             <input 
+              required
               type="url" 
               value={form.whatsappCommunityLink} 
               onChange={(e) => setForm({ ...form, whatsappCommunityLink: e.target.value })} 
@@ -542,8 +708,12 @@ export default function BatchesPage() {
               {coaches.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Schedule">
-            <input value={editForm.schedule} onChange={(e) => setEditForm({ ...editForm, schedule: e.target.value })} className={inputClass} />
+          <FormField label="Default Meeting Link">
+            <input type="url" value={editForm.meetingLink} onChange={(e) => setEditForm({ ...editForm, meetingLink: e.target.value })} className={inputClass} />
+            <p className="mt-1 text-xs text-[var(--color-muted)]">Updates future generated classes that still use the batch link.</p>
+          </FormField>
+          <FormField label="WhatsApp Group Link">
+            <input type="url" value={editForm.whatsappCommunityLink} onChange={(e) => setEditForm({ ...editForm, whatsappCommunityLink: e.target.value })} className={inputClass} />
           </FormField>
           <FormField label="Notes">
             <textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} className={textareaClass} rows={2} />
@@ -627,6 +797,30 @@ export default function BatchesPage() {
             </div>
           )}
         </div>
+      </Modal>
+
+      {/* Extra Class Modal */}
+      <Modal open={!!extraTarget} onClose={() => setExtraTarget(null)} title={`Schedule Extra Class — ${extraTarget?.name || ""}`} maxWidth="max-w-xl">
+        <form onSubmit={handleExtraClass} className="space-y-4">
+          {extraError && <div className="bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)] px-4 py-3 rounded-xl text-sm">{extraError}</div>}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <FormField label="Date" required><input required type="date" value={extraForm.date} onChange={(e) => setExtraForm({ ...extraForm, date: e.target.value })} className={inputClass} /></FormField>
+            <FormField label="Time" required>
+              <input required type="time" step="60" value={extraForm.startTime} onChange={(e) => setExtraForm({ ...extraForm, startTime: e.target.value })} className={inputClass} />
+              <p className="mt-1 text-xs text-[var(--color-muted)]">Any minute value is supported, including :05 and :30.</p>
+            </FormField>
+          </div>
+          <FormField label="Time Zone" required>
+            <select required value={extraForm.timezone} onChange={(e) => setExtraForm({ ...extraForm, timezone: e.target.value })} className={selectClass}>{TIMEZONES.map((timezone) => <option key={timezone} value={timezone}>{timezone}</option>)}</select>
+          </FormField>
+          <FormField label="Duration" required><DurationPicker value={extraForm.durationValue} unit={extraForm.durationUnit} onChange={(durationValue, durationUnit) => setExtraForm({ ...extraForm, durationValue, durationUnit })} /></FormField>
+          <FormField label="Meeting Link" required><input required type="url" value={extraForm.meetingLink} onChange={(e) => setExtraForm({ ...extraForm, meetingLink: e.target.value })} className={inputClass} placeholder="https://meet.google.com/..." /></FormField>
+          <FormField label="Reason / Description"><textarea value={extraForm.reason} onChange={(e) => setExtraForm({ ...extraForm, reason: e.target.value })} className={textareaClass} rows={3} placeholder="Holiday compensation, revision session, technical issue…" /></FormField>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setExtraTarget(null)} className={secondaryButtonClass}>Cancel</button>
+            <button type="submit" disabled={extraSaving} className={primaryButtonClass}>{extraSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarPlus className="h-4 w-4" />} Schedule Extra Class</button>
+          </div>
+        </form>
       </Modal>
 
       {/* Delete Modal */}

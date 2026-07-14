@@ -160,7 +160,9 @@ export const createClassSchema = z.object({
   endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   timezone: z.enum(SUPPORTED_TIMEZONES).optional(),
   meetingLink: z.url().optional().or(z.literal('')),
-  classType: z.enum(['regular', 'trial']).optional(),
+  classType: z.enum(['regular', 'extra', 'trial']).optional(),
+  accessOpensMinutesBefore: z.number().int().min(5).max(10).optional(),
+  extraClassReason: z.string().trim().max(1000).optional(),
   notes: z.string().optional(),
 });
 
@@ -184,11 +186,21 @@ export const createBatchSchema = z.object({
   courseLevel: courseLevelSchema,
   coach: z.string().min(1),
   students: z.array(z.string()).optional(),
-  schedule: z.string().optional(),
-  timezone: z.enum(SUPPORTED_TIMEZONES).optional(),
-  startDate: z.string().optional(),
+  frequencyDays: z.array(z.number().int().min(0).max(6)).min(1).max(7).refine(
+    (days) => new Set(days).size === days.length,
+    'Frequency days must be unique'
+  ),
+  classStartTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  classDurationMinutes: z.number().int().min(15).max(480),
+  accessOpensMinutesBefore: z.number().int().min(5).max(10).optional(),
+  timezone: z.enum(SUPPORTED_TIMEZONES),
+  startDate: z.iso.date(),
+  meetingLink: z.url().refine((value) => /^https?:\/\//i.test(value), 'Meeting link must use HTTP or HTTPS'),
   notes: z.string().optional(),
-  whatsappCommunityLink: z.string().optional(),
+  whatsappCommunityLink: z.url().refine(
+    (value) => /^https?:\/\//i.test(value),
+    'WhatsApp group link must use HTTP or HTTPS'
+  ),
 });
 
 export const updateBatchSchema = createBatchSchema.partial();
@@ -204,6 +216,16 @@ export const addStudentsToBatchSchema = z.object({
 
 export const updateBatchStatusSchema = z.object({
   status: z.enum(['upcoming', 'ongoing', 'completed']),
+});
+
+export const createExtraClassSchema = z.object({
+  date: z.iso.date(),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  timezone: z.enum(SUPPORTED_TIMEZONES),
+  durationMinutes: z.number().int().min(15).max(480),
+  meetingLink: z.url().refine((value) => /^https?:\/\//i.test(value), 'Meeting link must use HTTP or HTTPS'),
+  accessOpensMinutesBefore: z.number().int().min(5).max(10).optional(),
+  reason: z.string().trim().max(1000).optional(),
 });
 
 // ---- Attendance ----

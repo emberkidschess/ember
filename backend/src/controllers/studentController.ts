@@ -10,7 +10,7 @@ import { validateStaff, validateLead, validatePackage } from '../utils/foreignKe
 import { buildAuditLogData } from '../middleware/auditLogger';
 import { sanitizeQueryParam, sanitizePaginationParams } from '../utils/validation';
 import { CacheService, generateCacheKey, CacheNamespaces } from '../utils/cache';
-import { classWindow, localCalendarDateAsUtc } from '../utils/dateTime';
+import { classAccessWindow, localCalendarDateAsUtc } from '../utils/dateTime';
 import { ClientAuthService } from '../services/clientAuthService';
 import { getCourseSessionTotal, isCourseLevel } from '../domain/courseEnrollment';
 
@@ -587,7 +587,7 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
     const Batch = (await import('../models/Batch')).default;
     let currentBatch = student.currentBatchId
       ? await Batch.findById(student.currentBatchId)
-          .select('name courseLevel status schedule timezone coach totalSessions sessionsCompleted')
+          .select('name courseLevel status schedule timezone coach totalSessions sessionsCompleted whatsappCommunityLink classStartTime classDurationMinutes accessOpensMinutesBefore')
           .populate('coach', 'name')
       : null;
     if (!currentBatch) {
@@ -595,7 +595,7 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
         students: studentProfileId,
         status: { $in: ['upcoming', 'ongoing'] },
       })
-        .select('name courseLevel status schedule timezone coach totalSessions sessionsCompleted')
+        .select('name courseLevel status schedule timezone coach totalSessions sessionsCompleted whatsappCommunityLink classStartTime classDurationMinutes accessOpensMinutesBefore')
         .populate('coach', 'name')
         .sort({ createdAt: -1 });
     }
@@ -711,6 +711,10 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
           sessionsCompleted: currentBatch.sessionsCompleted || 0,
           schedule: currentBatch.schedule,
           timezone: currentBatch.timezone,
+          whatsappCommunityLink: currentBatch.whatsappCommunityLink,
+          classStartTime: currentBatch.classStartTime,
+          classDurationMinutes: currentBatch.classDurationMinutes,
+          accessOpensMinutesBefore: currentBatch.accessOpensMinutesBefore ?? 10,
           coach:
             currentBatch.coach && typeof currentBatch.coach === 'object' && 'name' in currentBatch.coach
               ? { name: (currentBatch.coach as any).name }
@@ -730,7 +734,7 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
         // complete class roster, internal fields, or a meeting link while the
         // student's portal is paused.
         upcomingClasses: upcomingClasses.map((classItem: any) => {
-          const { startAt, endAt } = classWindow(classItem);
+          const { opensAt, startAt, closesAt } = classAccessWindow(classItem);
           return {
             _id: classItem._id.toString(),
             course: classItem.course,
@@ -739,10 +743,12 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
             startTime: classItem.startTime,
             endTime: classItem.endTime,
             timezone: classItem.timezone,
+            status: classItem.status,
             hasMeetingLink:
               student.portalStatus === PortalStatus.ACTIVE && Boolean(classItem.meetingLink),
-            joinOpensAt: startAt.toISOString(),
-            joinClosesAt: endAt.toISOString(),
+            joinOpensAt: opensAt.toISOString(),
+            startsAt: startAt.toISOString(),
+            joinClosesAt: closesAt.toISOString(),
             coach: classItem.coach
               ? { name: classItem.coach.name, email: classItem.coach.email }
               : undefined,

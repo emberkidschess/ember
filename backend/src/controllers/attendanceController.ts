@@ -9,7 +9,7 @@ import Class from '../models/Class';
 import Student from '../models/Student';
 import Batch from '../models/Batch';
 import { buildAuditLogData } from '../middleware/auditLogger';
-import { classWindow } from '../utils/dateTime';
+import { classAccessWindow } from '../utils/dateTime';
 import {
   claimRenewalReminder,
   handleExhaustedPackage,
@@ -112,7 +112,6 @@ async function consumePackageForAttendance(
       ? await handleExhaustedPackage(updatedPackage._id, session)
       : { queuedPackageActivated: false, studentExpired: false };
 
-  const batchProgress = await finalizeClassBatchProgress(classData._id, session);
   return {
     success: true,
     creditConsumed: true,
@@ -121,7 +120,6 @@ async function consumePackageForAttendance(
     renewalReminderNeeded,
     studentExpired: exhaustion.studentExpired,
     authIdToRevoke: exhaustion.authIdToRevoke,
-    ...batchProgress,
   };
 }
 
@@ -402,16 +400,20 @@ export const joinClass = async (req: ClientAuthRequest, res: Response) => {
     // can't join after it has ended (the cron job owns marking absentees
     // past this point).
     const now = new Date();
-    const { startAt, endAt } = classWindow(classData);
+    const { opensAt, closesAt } = classAccessWindow(classData);
 
-    if (now < startAt) {
+    if (classData.status !== 'scheduled') {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, error: 'This class is not active' });
+    }
+    if (now < opensAt) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        error: 'This class has not started yet. The Join button will activate at the scheduled time.',
+        error: 'This class is not open yet. Join becomes available shortly before the scheduled time.',
       });
     }
-    if (now > endAt) {
+    if (now > closesAt) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,

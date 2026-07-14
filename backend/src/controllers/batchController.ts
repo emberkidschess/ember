@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import Batch, { BatchStatus } from '../models/Batch';
 import { AuthRequest } from '../middleware/auth';
 import AuditLog, { AuditAction, AuditEntityType } from '../models/AuditLog';
@@ -6,6 +7,18 @@ import { validateStudent, validateStaff, validateBatch } from '../utils/foreignK
 import { buildAuditLogData } from '../middleware/auditLogger';
 import { sanitizeQueryParam, sanitizePaginationParams } from '../utils/validation';
 import { CacheService, generateCacheKey, CacheNamespaces } from '../utils/cache';
+import {
+  addStudentsToScheduledBatchClasses,
+  assertCoachAvailableForScheduledBatch,
+  assertStudentsAvailableForScheduledBatch,
+  BatchSchedulingError,
+  createExtraBatchClass,
+  findNextBatchClass,
+  findNextBatchClasses,
+  formatRecurringSchedule,
+  generateRecurringClasses,
+  removeStudentFromScheduledBatchClasses,
+} from '../services/batchSchedulingService';
 
 export const getBatches = async (req: AuthRequest, res: Response) => {
   try {
@@ -19,7 +32,8 @@ export const getBatches = async (req: AuthRequest, res: Response) => {
     
     if (sanitizedStatus) filter.status = sanitizedStatus;
     if (sanitizedCourseLevel) filter.courseLevel = sanitizedCourseLevel;
-    if (sanitizedCoach) filter.coach = sanitizedCoach;
+    const scopedCoach = req.user?.role === 'coach' ? req.user.userId : sanitizedCoach;
+    if (scopedCoach) filter.coach = scopedCoach;
 
     const { page: pageNum, limit: limitNum } = sanitizePaginationParams(page, limit);
     const skip = (pageNum - 1) * limitNum;
@@ -27,7 +41,7 @@ export const getBatches = async (req: AuthRequest, res: Response) => {
     // Generate cache key based on filters and pagination
     const cacheKey = generateCacheKey(
       CacheNamespaces.BATCH_LIST,
-      `${sanitizedStatus}-${sanitizedCourseLevel}-${sanitizedCoach}-${pageNum}-${limitNum}`
+      `${req.user?.role}-${scopedCoach || 'all'}-${sanitizedStatus}-${sanitizedCourseLevel}-${pageNum}-${limitNum}`
     );
 
     // Try to get from cache first
@@ -46,7 +60,7 @@ export const getBatches = async (req: AuthRequest, res: Response) => {
         .populate('students', 'studentName parentName email studentStatus')
         .populate('coach', 'name email')
         .populate('createdBy', 'name email')
-        .select('name courseLevel coach students status schedule timezone startDate completedAt notes totalSessions sessionsCompleted sessions createdAt')
+        .select('name courseLevel coach students status schedule timezone startDate completedAt notes whatsappCommunityLink automationEnabled frequencyDays classStartTime classDurationMinutes meetingLink accessOpensMinutesBefore totalSessions sessionsCompleted sessions createdAt')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
@@ -54,8 +68,15 @@ export const getBatches = async (req: AuthRequest, res: Response) => {
       Batch.countDocuments(filter)
     ]);
 
+    const nextClasses = await findNextBatchClasses(batches.map((batch: any) => batch._id));
+    const data = batches.map((batch: any) => ({
+      ...batch,
+      studentCount: batch.students?.length || 0,
+      nextUpcomingClass: nextClasses.get(batch._id.toString()) || null,
+    }));
+
     const result = {
-      data: batches,
+      data,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -103,7 +124,7 @@ export const getBatchHistory = async (req: AuthRequest, res: Response) => {
     const batches = await Batch.find(filter)
       .populate('students', 'studentName parentName')
       .populate('coach', 'name email')
-      .select('name courseLevel coach students status schedule timezone startDate completedAt totalSessions sessionsCompleted createdAt')
+      .select('name courseLevel coach students status schedule timezone startDate completedAt whatsappCommunityLink automationEnabled frequencyDays classStartTime classDurationMinutes meetingLink accessOpensMinutesBefore totalSessions sessionsCompleted createdAt')
       .sort({ completedAt: -1 })
       .limit(100)
       .lean();
@@ -136,9 +157,22 @@ export const getBatchById = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    if (req.user?.role === 'coach') {
+      const coachId = batch.coach && typeof batch.coach === 'object' && '_id' in batch.coach
+        ? String((batch.coach as any)._id)
+        : String(batch.coach);
+      if (coachId !== req.user.userId) {
+        return res.status(403).json({ success: false, error: 'This batch is not assigned to you' });
+      }
+    }
+
     res.json({
       success: true,
-      data: batch,
+      data: {
+        ...batch,
+        studentCount: batch.students?.length || 0,
+        nextUpcomingClass: await findNextBatchClass(batch._id),
+      },
     });
   } catch (error: any) {
     console.error('Error fetching batch:', error);
@@ -156,10 +190,13 @@ export const getBatchById = async (req: AuthRequest, res: Response) => {
 };
 
 export const createBatch = async (req: AuthRequest, res: Response) => {
+  const session = await mongoose.startSession();
   try {
-    const ipAddress = req.ipAddress || 'unknown';
-    const userAgent = req.userAgent || 'unknown';
-    const { name, courseLevel, coach, students, schedule, timezone, startDate, notes, whatsappCommunityLink } = req.body;
+    const {
+      name, courseLevel, coach, students, frequencyDays, classStartTime,
+      classDurationMinutes, accessOpensMinutesBefore, timezone, startDate,
+      meetingLink, notes, whatsappCommunityLink,
+    } = req.body;
 
     await validateStaff(coach);
 
@@ -176,59 +213,54 @@ export const createBatch = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    const batch = await Batch.create({
-      name,
-      courseLevel,
-      coach,
-      students: studentIds,
-      schedule,
-      timezone,
-      startDate,
-      notes,
-      whatsappCommunityLink,
-      status: BatchStatus.UPCOMING,
-      createdBy: req.user?.userId,
+    let batch: any;
+    await session.withTransaction(async () => {
+      [batch] = await Batch.create([{
+        name, courseLevel, coach, students: studentIds,
+        schedule: formatRecurringSchedule(frequencyDays, classStartTime, timezone),
+        timezone, startDate, automationEnabled: true, frequencyDays,
+        classStartTime, classDurationMinutes, meetingLink,
+        accessOpensMinutesBefore: accessOpensMinutesBefore ?? 10,
+        notes, whatsappCommunityLink, status: BatchStatus.UPCOMING,
+        createdBy: req.user?.userId,
+      }], { session });
+
+      await generateRecurringClasses(batch, req.user!.userId, { session });
+
+      if (studentIds.length > 0) {
+        const Student = (await import('../models/Student')).default;
+        await Student.updateMany(
+          { _id: { $in: studentIds } },
+          { currentBatchId: batch._id, whatsappCommunityLink },
+          { session }
+        );
+      }
+
+      await AuditLog.create([buildAuditLogData(req, {
+        action: AuditAction.CREATE,
+        entityType: AuditEntityType.BATCH,
+        entityId: batch._id,
+        entityName: `${batch.name} (${batch.courseLevel})`,
+        details: { generatedClasses: batch.totalSessions },
+        success: true,
+      })], { session });
     });
 
     if (studentIds.length > 0) {
       const Student = (await import('../models/Student')).default;
-      await Student.updateMany(
-        { _id: { $in: studentIds } }, 
-        { 
-          currentBatchId: batch._id,
-          ...(whatsappCommunityLink && { whatsappCommunityLink })
-        }
-      );
-
-      // Send WhatsApp link email to students if link is provided
-      if (whatsappCommunityLink) {
-        const emailService = (await import('../services/emailService')).default;
-        const students = await Student.find({ _id: { $in: studentIds } });
-        
-        for (const student of students) {
-          await emailService.sendTemplatedEmail(
-            student.email,
-            'batch_whatsapp_link',
-            {
-              parentName: student.parentName,
-              studentName: student.studentName,
-              batchName: batch.name,
-              courseLevel: batch.courseLevel,
-              whatsappLink: whatsappCommunityLink,
-              schedule: batch.schedule,
-            }
-          );
-        }
-      }
+      const emailService = (await import('../services/emailService')).default;
+      const assignedStudents = await Student.find({ _id: { $in: studentIds } });
+      await Promise.allSettled(assignedStudents.map((student) =>
+        emailService.sendTemplatedEmail(student.email, 'batch_whatsapp_link', {
+          parentName: student.parentName,
+          studentName: student.studentName,
+          batchName: batch.name,
+          courseLevel: batch.courseLevel,
+          whatsappLink: whatsappCommunityLink,
+          schedule: batch.schedule,
+        })
+      ));
     }
-
-    await AuditLog.create(buildAuditLogData(req, {
-      action: AuditAction.CREATE,
-      entityType: AuditEntityType.BATCH,
-      entityId: batch._id,
-      entityName: `${batch.name} (${batch.courseLevel})`,
-      success: true,
-    }));
 
     // Invalidate batch list cache
     await CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`);
@@ -236,14 +268,20 @@ export const createBatch = async (req: AuthRequest, res: Response) => {
     res.status(201).json({
       success: true,
       data: batch,
-      message: 'Batch created successfully',
+      message: `Batch created and ${batch.totalSessions} recurring classes scheduled automatically`,
     });
   } catch (error: any) {
     console.error('Error creating batch:', error);
-    if (error.name === 'ValidationError') {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        error: 'A batch with this name already exists for the selected course',
+      });
+    }
+    if (error.name === 'ValidationError' || error instanceof BatchSchedulingError) {
       return res.status(400).json({
         success: false,
-        error: `Validation error: ${error.message}`,
+        error: error.message,
       });
     }
     if (error.message?.includes('Staff not found')) {
@@ -262,14 +300,14 @@ export const createBatch = async (req: AuthRequest, res: Response) => {
       success: false,
       error: 'Failed to create batch due to server error',
     });
+  } finally {
+    await session.endSession();
   }
 };
 
 export const updateBatch = async (req: AuthRequest, res: Response) => {
   try {
-    const ipAddress = req.ipAddress || 'unknown';
-    const userAgent = req.userAgent || 'unknown';
-    const { name, coach, schedule, timezone, startDate, notes } = req.body;
+    const { name, coach, notes, meetingLink, whatsappCommunityLink } = req.body;
 
     const batch = await Batch.findById(req.params.id);
     if (!batch) {
@@ -289,13 +327,45 @@ export const updateBatch = async (req: AuthRequest, res: Response) => {
       batch.name = name;
     }
 
+    const structuralScheduleFields = ['frequencyDays', 'classStartTime', 'classDurationMinutes', 'timezone', 'startDate'];
+    if (batch.automationEnabled && structuralScheduleFields.some((field) =>
+      Object.prototype.hasOwnProperty.call(req.body, field)
+    )) {
+      return res.status(409).json({
+        success: false,
+        error: 'Recurring schedule fields cannot be changed after classes are generated. Reschedule an individual class instead.',
+      });
+    }
+
+    const previousCoach = batch.coach.toString();
+    if (coach && coach !== previousCoach) {
+      await assertCoachAvailableForScheduledBatch(batch._id, coach);
+    }
     if (coach) batch.coach = coach;
-    if (schedule !== undefined) batch.schedule = schedule;
-    if (timezone !== undefined) batch.timezone = timezone;
-    if (startDate !== undefined) batch.startDate = startDate;
     if (notes !== undefined) batch.notes = notes;
+    if (meetingLink !== undefined) batch.meetingLink = meetingLink;
+    if (whatsappCommunityLink !== undefined) batch.whatsappCommunityLink = whatsappCommunityLink;
 
     await batch.save();
+
+    const Class = (await import('../models/Class')).default;
+    const Attendance = (await import('../models/Attendance')).default;
+    if (meetingLink !== undefined) {
+      await Class.updateMany(
+        { batch: batch._id, status: 'scheduled', meetingLinkSource: 'batch' },
+        { $set: { meetingLink } }
+      );
+    }
+    if (coach && coach !== previousCoach) {
+      const futureClasses = await Class.find({ batch: batch._id, status: 'scheduled' }).select('_id');
+      const classIds = futureClasses.map((item) => item._id);
+      await Class.updateMany({ _id: { $in: classIds } }, { $set: { coach } });
+      await Attendance.updateMany({ class: { $in: classIds } }, { $set: { coach } });
+    }
+    if (whatsappCommunityLink !== undefined) {
+      const Student = (await import('../models/Student')).default;
+      await Student.updateMany({ _id: { $in: batch.students } }, { $set: { whatsappCommunityLink } });
+    }
 
     await AuditLog.create(buildAuditLogData(req, {
       action: AuditAction.UPDATE,
@@ -316,6 +386,12 @@ export const updateBatch = async (req: AuthRequest, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error updating batch:', error);
+    if (error instanceof BatchSchedulingError) {
+      return res.status(409).json({
+        success: false,
+        error: error.message,
+      });
+    }
     if (error.name === 'ValidationError') {
       return res.status(400).json({
         success: false,
@@ -429,12 +505,21 @@ export const addStudentsToBatch = async (req: AuthRequest, res: Response) => {
     const existingIds = new Set(batch.students.map((id) => id.toString()));
     const newIds = studentIds.filter((id) => !existingIds.has(id));
 
+    await assertStudentsAvailableForScheduledBatch(batch._id, newIds);
+
     batch.students.push(...(newIds as any[]));
     await batch.save();
 
     if (newIds.length > 0) {
       const Student = (await import('../models/Student')).default;
-      await Student.updateMany({ _id: { $in: newIds } }, { currentBatchId: batch._id });
+      await Student.updateMany(
+        { _id: { $in: newIds } },
+        {
+          currentBatchId: batch._id,
+          ...(batch.whatsappCommunityLink ? { whatsappCommunityLink: batch.whatsappCommunityLink } : {}),
+        }
+      );
+      await addStudentsToScheduledBatchClasses(batch._id, newIds);
     }
 
     await AuditLog.create(buildAuditLogData(req, {
@@ -458,6 +543,12 @@ export const addStudentsToBatch = async (req: AuthRequest, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error adding students to batch:', error);
+    if (error instanceof BatchSchedulingError) {
+      return res.status(409).json({
+        success: false,
+        error: error.message,
+      });
+    }
     if (error.name === 'CastError') {
       return res.status(400).json({
         success: false,
@@ -493,6 +584,7 @@ export const removeStudentFromBatch = async (req: AuthRequest, res: Response) =>
 
     const Student = (await import('../models/Student')).default;
     await Student.updateOne({ _id: studentId, currentBatchId: batch._id }, { $unset: { currentBatchId: '' } });
+    await removeStudentFromScheduledBatchClasses(batch._id, studentId);
 
     await AuditLog.create(buildAuditLogData(req, {
       action: AuditAction.UPDATE,
@@ -531,7 +623,7 @@ export const removeStudentFromBatch = async (req: AuthRequest, res: Response) =>
 const ALLOWED_TRANSITIONS: Record<BatchStatus, BatchStatus[]> = {
   [BatchStatus.UPCOMING]: [BatchStatus.ONGOING, BatchStatus.COMPLETED],
   [BatchStatus.ONGOING]: [BatchStatus.COMPLETED, BatchStatus.UPCOMING],
-  [BatchStatus.COMPLETED]: [BatchStatus.ONGOING],
+  [BatchStatus.COMPLETED]: [],
 };
 
 export const updateBatchStatus = async (req: AuthRequest, res: Response) => {
@@ -555,6 +647,22 @@ export const updateBatchStatus = async (req: AuthRequest, res: Response) => {
     batch.status = status;
     batch.completedAt = status === BatchStatus.COMPLETED ? new Date() : undefined;
     await batch.save();
+
+    if (status === BatchStatus.COMPLETED) {
+      const Class = (await import('../models/Class')).default;
+      const Attendance = (await import('../models/Attendance')).default;
+      const scheduled = await Class.find({ batch: batch._id, status: 'scheduled' }).select('_id');
+      const classIds = scheduled.map((item) => item._id);
+      await Class.updateMany(
+        { _id: { $in: classIds } },
+        { $set: { status: 'cancelled', cancellationReason: 'Batch completed' } }
+      );
+      await Attendance.deleteMany({
+        class: { $in: classIds },
+        status: 'not_marked',
+        attendanceConsumed: false,
+      });
+    }
 
     await AuditLog.create(buildAuditLogData(req, {
       action: AuditAction.UPDATE,
@@ -588,6 +696,52 @@ export const updateBatchStatus = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const createExtraClass = async (req: AuthRequest, res: Response) => {
+  const session = await mongoose.startSession();
+  try {
+    let classItem: any;
+    await session.withTransaction(async () => {
+      const batch = await Batch.findById(req.params.id).session(session);
+      if (!batch) throw new BatchSchedulingError('Batch not found');
+      classItem = await createExtraBatchClass(batch, req.body, req.user!.userId, { session });
+      await AuditLog.create([buildAuditLogData(req, {
+        action: AuditAction.CREATE,
+        entityType: AuditEntityType.CLASS,
+        entityId: classItem._id,
+        entityName: `Extra class for ${batch.name}`,
+        details: { reason: req.body.reason },
+        success: true,
+      })], { session });
+    });
+
+    try {
+      const { notifyClassScheduled } = await import('../utils/classNotifications');
+      await notifyClassScheduled(
+        classItem._id.toString(),
+        classItem.students.map((studentId: any) => studentId.toString())
+      );
+    } catch (notificationError) {
+      console.error('Failed to send extra-class notifications:', notificationError);
+    }
+
+    await CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`);
+    await CacheService.delete(generateCacheKey(CacheNamespaces.BATCH_DETAILS, req.params.id));
+    return res.status(201).json({
+      success: true,
+      data: classItem,
+      message: 'Extra class scheduled for everyone in the batch',
+    });
+  } catch (error: any) {
+    console.error('Error creating extra class:', error);
+    if (error instanceof BatchSchedulingError || error.name === 'ValidationError') {
+      return res.status(error.message === 'Batch not found' ? 404 : 400).json({ success: false, error: error.message });
+    }
+    return res.status(500).json({ success: false, error: 'Failed to schedule extra class' });
+  } finally {
+    await session.endSession();
+  }
+};
+
 export const deleteBatch = async (req: AuthRequest, res: Response) => {
   try {
     const ipAddress = req.ipAddress || 'unknown';
@@ -599,14 +753,23 @@ export const deleteBatch = async (req: AuthRequest, res: Response) => {
     }
 
     const Class = (await import('../models/Class')).default;
-    const classCount = await Class.countDocuments({ batch: batch._id });
-    if (batch.students.length > 0 || classCount > 0) {
+    const classes = await Class.find({ batch: batch._id }).select('_id status autoGenerated');
+    const hasHistoryOrManualClasses = classes.some(
+      (classItem) => classItem.status !== 'scheduled' || !classItem.autoGenerated
+    );
+    if (batch.students.length > 0 || hasHistoryOrManualClasses) {
       return res.status(409).json({
         success: false,
         error: 'Batches with students or class history cannot be deleted. Mark the batch completed instead.',
       });
     }
 
+    const classIds = classes.map((classItem) => classItem._id);
+    if (classIds.length > 0) {
+      const Attendance = (await import('../models/Attendance')).default;
+      await Attendance.deleteMany({ class: { $in: classIds } });
+      await Class.deleteMany({ _id: { $in: classIds } });
+    }
     await batch.deleteOne();
 
     await AuditLog.create(buildAuditLogData(req, {

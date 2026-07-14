@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Search, Calendar, Users } from "lucide-react";
+import { Loader2, Search, Calendar, Users, Clock3, ExternalLink, MessageCircle } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { getBatches, type Batch } from "@/lib/adminApi";
@@ -80,6 +80,8 @@ export default function StaffBatchesPage() {
               <th className="text-left">Name</th>
               <th className="text-left">Level</th>
               <th className="text-left">Schedule</th>
+              <th className="text-left">Coach</th>
+              <th className="text-left">Next Class</th>
               <th className="text-left">Students</th>
               <th className="text-left">Status</th>
             </tr>
@@ -92,8 +94,21 @@ export default function StaffBatchesPage() {
                 <td className="whitespace-nowrap">
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4" />
-                    {batch.schedule}
+                    {batch.schedule || "Legacy schedule"}
                   </div>
+                  <div className="mt-1.5 flex gap-3 text-xs">
+                    {batch.meetingLink && <a href={batch.meetingLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--color-pine-deep)] hover:underline"><ExternalLink className="h-3 w-3" /> Meeting</a>}
+                    {batch.whatsappCommunityLink && <a href={batch.whatsappCommunityLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--color-pine-deep)] hover:underline"><MessageCircle className="h-3 w-3" /> WhatsApp</a>}
+                  </div>
+                </td>
+                <td className="whitespace-nowrap">{typeof batch.coach === "object" ? batch.coach.name : "Assigned coach"}</td>
+                <td className="whitespace-nowrap">
+                  {batch.nextUpcomingClass ? (
+                    <div className="text-sm">
+                      <p>{new Date(batch.nextUpcomingClass.date).toLocaleDateString(undefined, { timeZone: "UTC" })}</p>
+                      <p className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--color-muted)]"><Clock3 className="h-3 w-3" /> {batch.nextUpcomingClass.startTime} · {batch.nextUpcomingClass.timezone}</p>
+                    </div>
+                  ) : "—"}
                 </td>
                 <td className="whitespace-nowrap">
                   <div className="flex items-center gap-2 text-sm">

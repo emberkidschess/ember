@@ -9,6 +9,7 @@ import {
   addStudentsToBatch,
   removeStudentFromBatch,
   updateBatchStatus,
+  createExtraClass,
   deleteBatch,
 } from '../controllers/batchController';
 import { strictLimiter } from '../middleware/rateLimiter';
@@ -19,6 +20,7 @@ import {
   renameBatchSchema,
   addStudentsToBatchSchema,
   updateBatchStatusSchema,
+  createExtraClassSchema,
   validate,
 } from '../utils/validation';
 
@@ -56,6 +58,16 @@ router.patch(
   requirePermission('create_edit_class'),
   validate(renameBatchSchema),
   (req: AuthRequest, res) => renameBatch(req, res)
+);
+
+router.post(
+  '/:id/extra-classes',
+  strictLimiter,
+  authenticate,
+  requireStaffOrAdmin,
+  requireAnyPermission('schedule_classes', 'create_edit_class'),
+  validate(createExtraClassSchema),
+  (req: AuthRequest, res) => createExtraClass(req, res)
 );
 
 router.post(
