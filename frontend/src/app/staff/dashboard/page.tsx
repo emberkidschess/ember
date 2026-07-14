@@ -13,6 +13,7 @@ interface StaffDashboardData {
     newLeadsToday?: number;
     totalStudents?: number;
     activeStudents?: number;
+    convertedLeads?: number;
   };
   recentLeads?: Record<string, unknown>[];
   recentStudents?: Record<string, unknown>[];
@@ -75,6 +76,7 @@ export default function StaffDashboardPage() {
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Open Leads" value={overview.totalLeads ?? 0} icon={Users} accent="gold" hint={`${overview.newLeadsToday ?? 0} new today`} />
         <StatCard label="Students" value={overview.totalStudents ?? 0} icon={GraduationCap} accent="pine" hint={`${overview.activeStudents ?? 0} active`} />
+        <StatCard label="Converted Leads" value={overview.convertedLeads ?? 0} icon={TrendingUp} accent="ember" hint="your conversions" />
         <StatCard label="Lead Momentum" value={overview.newLeadsToday ?? 0} icon={TrendingUp} accent="ember" hint="new today" />
         <StatCard label="Follow-ups" value={recentLeads.length} icon={CalendarClock} accent="walnut" hint="recent leads" />
       </div>

@@ -169,6 +169,8 @@ export const createStudent = async (req: AuthRequest, res: Response) => {
         convertedToStudent: true,
         studentId: student[0]._id,
         status: 'converted',
+        convertedBy: req.user?.userId,
+        convertedAt: new Date(),
       }, { session });
     }
 
@@ -184,6 +186,9 @@ export const createStudent = async (req: AuthRequest, res: Response) => {
 
     // Invalidate student list cache
     await CacheService.deletePattern(`${CacheNamespaces.STUDENT_LIST}:*`);
+    if (req.body.leadId) {
+      await CacheService.deletePattern(`${CacheNamespaces.DASHBOARD_STATS}:*`);
+    }
 
     res.status(201).json({
       success: true,

@@ -32,6 +32,7 @@ import {
   assertPackageCanUpgrade,
 } from '../services/enrollmentLifecycleService';
 import { sanitizePaginationParams, sanitizeQueryParam } from '../utils/validation';
+import { CacheService, CacheNamespaces } from '../utils/cache';
 
 type PaymentLinkShareChannel = 'email' | 'whatsapp' | 'copy_link';
 type PaymentLinkDeliveryFailure = { channel: PaymentLinkShareChannel; error: string };
@@ -1181,6 +1182,13 @@ export const activatePackage = async (req: AuthRequest, res: Response) => {
     }
 
     await session.commitTransaction();
+
+    // Conversion counts are part of both dashboard views. Clear them only
+    // after the transaction commits so a failed activation never exposes a
+    // partially updated analytics result.
+    if (paymentLink.lead) {
+      await CacheService.deletePattern(`${CacheNamespaces.DASHBOARD_STATS}:*`);
+    }
 
     // Send welcome notification outside the transaction - email
     // failures should not roll back a successful activation.

@@ -90,7 +90,13 @@ export const createOrUpdateStudentWithAuth = async (
     // Mark lead as converted
     await Lead.findByIdAndUpdate(
       lead._id,
-      { convertedToStudent: true, status: LeadStatus.CONVERTED, studentId: newStudent._id },
+      {
+        convertedToStudent: true,
+        status: LeadStatus.CONVERTED,
+        studentId: newStudent._id,
+        convertedBy: createdBy,
+        convertedAt: new Date(),
+      },
       { session }
     );
 

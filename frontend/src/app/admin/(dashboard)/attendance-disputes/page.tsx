@@ -13,7 +13,7 @@ import {
   secondaryButtonClass,
   dangerButtonClass,
 } from "@/components/admin/FormField";
-import { getDisputedAttendance, resolveDispute, type AttendanceItem } from "@/lib/adminApi";
+import { getDisputedAttendance, overrideAttendance, resolveDispute, type AttendanceItem } from "@/lib/adminApi";
 import { hasPermission } from "@/lib/auth";
 
 export default function AttendanceDisputesPage() {
@@ -26,8 +26,13 @@ export default function AttendanceDisputesPage() {
   const [decision, setDecision] = useState<"approve" | "reject" | null>(null);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [overrideTarget, setOverrideTarget] = useState<AttendanceItem | null>(null);
+  const [overrideStatus, setOverrideStatus] = useState<"present" | "absent">("present");
+  const [overrideNotes, setOverrideNotes] = useState("");
+  const [overrideSaving, setOverrideSaving] = useState(false);
 
   const canResolve = hasPermission("resolve_attendance_dispute");
+  const canOverride = hasPermission("override_attendance");
 
   const load = async () => {
     setLoading(true);
@@ -71,6 +76,33 @@ export default function AttendanceDisputesPage() {
       setError("Could not connect to the server.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openOverride = (item: AttendanceItem, status: "present" | "absent") => {
+    setOverrideTarget(item);
+    setOverrideStatus(status);
+    setOverrideNotes("");
+  };
+
+  const handleOverride = async () => {
+    if (!overrideTarget) return;
+    setOverrideSaving(true);
+    try {
+      const res = await overrideAttendance(overrideTarget._id, overrideStatus, overrideNotes || undefined);
+      if (res.success) {
+        setOverrideTarget(null);
+        setOverrideNotes("");
+        setSuccessMsg(`Attendance corrected to ${overrideStatus}.`);
+        setTimeout(() => setSuccessMsg(""), 4000);
+        await load();
+      } else {
+        setError(res.error || "Failed to override attendance.");
+      }
+    } catch {
+      setError("Could not connect to the server.");
+    } finally {
+      setOverrideSaving(false);
     }
   };
 
@@ -130,6 +162,16 @@ export default function AttendanceDisputesPage() {
                     </button>
                   </div>
                 )}
+                {canOverride && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => openOverride(d, "absent")} className={secondaryButtonClass}>
+                      <XCircle className="h-4 w-4" /> Mark Absent
+                    </button>
+                    <button onClick={() => openOverride(d, "present")} className={primaryButtonClass}>
+                      <CheckCircle2 className="h-4 w-4" /> Mark Present
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -161,6 +203,29 @@ export default function AttendanceDisputesPage() {
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : decision === "approve" ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
               {decision === "approve" ? "Approve" : "Reject"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!overrideTarget}
+        onClose={() => !overrideSaving && setOverrideTarget(null)}
+        title="Override Attendance"
+        maxWidth="max-w-sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-[var(--color-muted)]">
+            Mark <strong>{overrideTarget?.student?.studentName}</strong> as {overrideStatus} directly. This bypasses the dispute decision flow.
+          </p>
+          <FormField label="Notes (optional)">
+            <textarea value={overrideNotes} onChange={(e) => setOverrideNotes(e.target.value)} className={textareaClass} rows={2} />
+          </FormField>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setOverrideTarget(null)} disabled={overrideSaving} className={secondaryButtonClass}>Cancel</button>
+            <button type="button" onClick={handleOverride} disabled={overrideSaving} className={overrideStatus === "present" ? primaryButtonClass : dangerButtonClass}>
+              {overrideSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : overrideStatus === "present" ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              Mark {overrideStatus === "present" ? "Present" : "Absent"}
             </button>
           </div>
         </div>

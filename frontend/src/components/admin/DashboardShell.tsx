@@ -69,7 +69,7 @@ const STAFF_NAV_GROUPS: NavGroup[] = [
       { href: "/staff/payment-links", icon: CreditCard, label: "Payment Links", requiredAnyPermissions: ["view_payment_history", "generate_payment_link", "send_payment_link", "mark_payment_received", "enroll_student"] },
       { href: "/staff/batches", icon: Layers, label: "Batches", requiredAnyPermissions: ["schedule_classes", "create_edit_class", "assign_students_to_class", "assign_staff_to_class", "enroll_student"] },
       { href: "/staff/classes", icon: GraduationCap, label: "Classes", requiredAnyPermissions: ["schedule_classes", "create_edit_class", "assign_students_to_class", "assign_staff_to_class", "reschedule_class", "cancel_class", "post_class_notes"] },
-      { href: "/staff/report-cards", icon: FileText, label: "Report Cards", requiredAnyPermissions: ["create_report_card", "export_report_card"] },
+      { href: "/staff/report-cards", icon: FileText, label: "Report Cards", requiredAnyPermissions: ["view_students", "create_report_card", "export_report_card"] },
     ],
   },
 ];

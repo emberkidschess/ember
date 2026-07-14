@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import Staff, { StaffRole, StaffStatus } from '../models/Staff';
-import Lead from '../models/Lead';
+import Lead, { LeadStatus } from '../models/Lead';
 import Student, { StudentStatus, EnrollmentStatus } from '../models/Student';
 import AuditLog, { AuditAction } from '../models/AuditLog';
 import { Course } from '../models/Course';
@@ -14,6 +14,37 @@ import Batch from '../models/Batch';
 import Attendance from '../models/Attendance';
 import Notification from '../models/Notification';
 import { CacheService, generateCacheKey, CacheNamespaces } from '../utils/cache';
+
+const convertedLeadMatch = {
+  $or: [
+    { convertedToStudent: true },
+    { status: LeadStatus.CONVERTED },
+  ],
+};
+
+// Older converted leads predate convertedBy. Keep them visible by falling
+// back to their assignee, then creator, while all new conversions use the
+// explicit actor recorded during activation.
+const conversionStaffExpression = {
+  $ifNull: ['$convertedBy', { $ifNull: ['$assignedTo', '$createdBy'] }],
+};
+
+const getStaffConversionFilter = (staffId: string) => ({
+  $and: [
+    convertedLeadMatch,
+    {
+      $or: [
+        { convertedBy: staffId },
+        { convertedBy: { $exists: false }, assignedTo: staffId },
+        {
+          convertedBy: { $exists: false },
+          assignedTo: { $exists: false },
+          createdBy: staffId,
+        },
+      ],
+    },
+  ],
+});
 
 export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
   try {
@@ -53,6 +84,7 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
       totalPackagePurchases,
       paidPackagePurchases,
       convertedLeads,
+      leadConversionsByStaff,
       leadsByStatus,
       leadsBySource,
       studentsByStatus,
@@ -92,7 +124,30 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
       Package.countDocuments({ status: 'completed' }),
       Payment.countDocuments(),
       Payment.countDocuments({ status: PaymentStatus.PAID }),
-      Lead.countDocuments({ status: 'converted' }),
+      Lead.countDocuments(convertedLeadMatch),
+      Lead.aggregate([
+        { $match: convertedLeadMatch },
+        { $group: { _id: conversionStaffExpression, convertedLeads: { $sum: 1 } } },
+        {
+          $lookup: {
+            from: 'staff',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'staff',
+          },
+        },
+        { $unwind: { path: '$staff', preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            _id: 0,
+            staffId: '$_id',
+            staffName: { $ifNull: ['$staff.name', 'Unassigned'] },
+            staffEmail: '$staff.email',
+            convertedLeads: 1,
+          },
+        },
+        { $sort: { convertedLeads: -1, staffName: 1 } },
+      ]),
       Lead.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
       Lead.aggregate([{ $group: { _id: '$leadSource', count: { $sum: 1 } } }]),
       Student.aggregate([{ $group: { _id: '$studentStatus', count: { $sum: 1 } } }]),
@@ -203,6 +258,7 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
       statistics: {
         leadsByStatus,
         leadsBySource,
+        leadConversionsByStaff,
         studentsByStatus,
         studentsByEnrollment,
         packagesByStatus,
@@ -237,7 +293,11 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
 
 export const getStaffDashboard = async (req: AuthRequest, res: Response) => {
   try {
-    const cacheKey = generateCacheKey(CacheNamespaces.DASHBOARD_STATS, 'staff');
+    const staffId = req.user?.userId;
+    const cacheKey = generateCacheKey(
+      CacheNamespaces.DASHBOARD_STATS,
+      `staff-${staffId || 'unknown'}`
+    );
     const cached = await CacheService.get(cacheKey);
     if (cached) {
       return res.json({
@@ -252,6 +312,7 @@ export const getStaffDashboard = async (req: AuthRequest, res: Response) => {
       newLeadsToday,
       totalStudents,
       activeStudents,
+      convertedLeads,
       recentLeads,
       recentStudents,
     ] = await Promise.all([
@@ -262,6 +323,9 @@ export const getStaffDashboard = async (req: AuthRequest, res: Response) => {
       }),
       Student.countDocuments(),
       Student.countDocuments({ studentStatus: StudentStatus.ACTIVE }),
+      staffId
+        ? Lead.countDocuments(getStaffConversionFilter(staffId))
+        : Promise.resolve(0),
       Lead.find({ convertedToStudent: { $ne: true } })
         .sort({ createdAt: -1 })
         .limit(10)
@@ -290,6 +354,7 @@ export const getStaffDashboard = async (req: AuthRequest, res: Response) => {
           newLeadsToday,
           totalStudents,
           activeStudents,
+          convertedLeads,
         },
         statistics: {
           leadsByStatus,

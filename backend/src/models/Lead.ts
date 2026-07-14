@@ -44,6 +44,9 @@ export interface ILead extends Document {
   assignedTo?: mongoose.Types.ObjectId;
   convertedToStudent?: boolean;
   studentId?: mongoose.Types.ObjectId;
+  /** Staff member who completed the lead-to-student conversion. */
+  convertedBy?: mongoose.Types.ObjectId;
+  convertedAt?: Date;
   followUpDate?: Date;
   lastContactDate?: Date;
   createdBy?: mongoose.Types.ObjectId;
@@ -117,6 +120,13 @@ const LeadSchema: Schema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'Student',
     },
+    convertedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'Staff',
+    },
+    convertedAt: {
+      type: Date,
+    },
     followUpDate: {
       type: Date,
     },
@@ -136,6 +146,7 @@ const LeadSchema: Schema = new Schema(
 LeadSchema.index({ status: 1, createdAt: -1 });
 LeadSchema.index({ leadSource: 1, createdAt: -1 });
 LeadSchema.index({ assignedTo: 1 });
+LeadSchema.index({ convertedBy: 1, convertedToStudent: 1 });
 LeadSchema.index({ email: 1 });
 LeadSchema.index({ phoneNumber: 1 });
 LeadSchema.index({ createdAt: -1 });

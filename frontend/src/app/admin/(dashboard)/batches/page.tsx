@@ -35,7 +35,7 @@ import {
   type StaffMember,
   type Student,
 } from "@/lib/adminApi";
-import { hasPermission } from "@/lib/auth";
+import { hasAnyPermission } from "@/lib/auth";
 import {
   COURSE_LEVELS,
   COURSE_SESSION_TOTALS,
@@ -168,7 +168,7 @@ export default function BatchesPage() {
   const [extraSaving, setExtraSaving] = useState(false);
   const [extraError, setExtraError] = useState("");
 
-  const canManage = hasPermission("create_edit_class");
+  const canManage = hasAnyPermission("schedule_classes", "create_edit_class");
 
   const loadData = async () => {
     setLoading(true);
