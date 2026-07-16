@@ -70,7 +70,7 @@ export async function findEligibleRunningBatchIds(criteria: AcademyEventCriteria
   const batches = await batchQuery.lean();
   if (batches.length === 0) return [];
 
-  const studentIds = batches.flatMap((batch) => batch.students.map((id) => id.toString()));
+  const studentIds = batches.flatMap((batch) => (batch.students || []).map((id) => id.toString()));
   const studentQuery = Student.find({
     _id: { $in: studentIds },
     country: criteria.country,
@@ -80,7 +80,7 @@ export async function findEligibleRunningBatchIds(criteria: AcademyEventCriteria
   const eligibleStudentIds = new Set((await studentQuery.lean()).map((student) => student._id.toString()));
 
   return batches
-    .filter((batch) => batch.students.some((studentId) => eligibleStudentIds.has(studentId.toString())))
+    .filter((batch) => (batch.students || []).some((studentId) => eligibleStudentIds.has(studentId.toString())))
     .map((batch) => batch._id);
 }
 
