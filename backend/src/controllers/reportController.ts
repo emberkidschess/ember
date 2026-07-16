@@ -55,7 +55,7 @@ export const getCoachReports = async (req: AuthRequest, res: Response) => {
         .lean(),
       Batch.find(coach ? { coach } : {})
         .populate('coach', 'name email')
-        .select('name schedule timezone courseLevel status sessions startDate completedAt coach')
+        .select('name schedule timezone courseLevel status sessions totalSessions sessionsCompleted startDate completedAt coach')
         .sort({ createdAt: -1 })
         .limit(200)
         .lean(),
@@ -87,8 +87,8 @@ export const getCoachReports = async (req: AuthRequest, res: Response) => {
       }));
 
     const batchIds = batchRecords.map((batch: any) => batch._id);
-    const batchClasses = batchIds.length
-      ? await Class.find({ batch: { $in: batchIds }, classType: 'regular' })
+    const batchClasses = batchIds.length && dailyRange
+      ? await Class.find({ batch: { $in: batchIds }, classType: 'regular', date: dailyRange })
         .select('batch date startTime endTime status classType sessionNumber')
         .sort({ date: 1, startTime: 1 })
         .lean()
@@ -103,25 +103,16 @@ export const getCoachReports = async (req: AuthRequest, res: Response) => {
 
     const batchReport = batchRecords.map((batch: any) => {
       const history = classesByBatch.get(batch._id.toString()) || [];
-      const dailyHistory = dailyRange
-        ? history.filter((item) => {
-          const timestamp = new Date(item.date).getTime();
-          const from = dailyRange.$gte?.getTime();
-          const to = dailyRange.$lte?.getTime();
-          return (from === undefined || timestamp >= from) && (to === undefined || timestamp <= to);
-        })
-        : [];
-      const completedClasses = history.filter((item) => item.status === ClassStatus.COMPLETED).length;
       return {
         _id: batch._id.toString(),
         batchName: batch.name,
         schedule: batch.schedule,
         completionStatus: batch.status,
         completedAt: batch.completedAt,
-        totalScheduledClasses: history.length,
-        totalCompletedClasses: completedClasses,
-        dailyClassCount: reportDay ? dailyHistory.length : 0,
-        dailyClassSchedule: reportDay ? dailyHistory.map((item) => ({
+        totalScheduledClasses: batch.totalSessions || 0,
+        totalCompletedClasses: batch.sessionsCompleted || 0,
+        dailyClassCount: reportDay ? history.length : 0,
+        dailyClassSchedule: reportDay ? history.map((item) => ({
           _id: item._id.toString(),
           date: item.date,
           startTime: item.startTime,
@@ -130,8 +121,8 @@ export const getCoachReports = async (req: AuthRequest, res: Response) => {
           sessionNumber: item.sessionNumber,
           status: item.status,
         })) : [],
-        // Kept for existing consumers; the UI intentionally renders the daily
-        // schedule separately from this full course-progress history.
+        // This is intentionally the selected day's history only. The full
+        // course progress is represented by the counters above.
         classCompletionHistory: history.map((item) => ({
           _id: item._id.toString(),
           date: item.date,
