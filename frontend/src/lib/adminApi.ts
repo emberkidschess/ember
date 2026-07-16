@@ -468,7 +468,7 @@ export interface ClassItem {
   createdAt: string;
 }
 
-export const getClasses = (params?: { status?: string; student?: string; batch?: string; coach?: string; page?: string | number; limit?: string | number }) =>
+export const getClasses = (params?: { status?: string; classType?: string; student?: string; batch?: string; coach?: string; dateFrom?: string; dateTo?: string; page?: string | number; limit?: string | number }) =>
   adminFetchJSON<ApiListResponse<ClassItem>>(`/classes${toQueryString({ limit: 100, ...params })}`);
 
 export const getClass = (id: string) => adminFetchJSON<ApiItemResponse<ClassItem>>(`/classes/${id}`);

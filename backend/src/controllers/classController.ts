@@ -124,7 +124,7 @@ function normalizeTrialResultForLead(trialResult: TrialResult) {
 
 export const getClasses = async (req: AuthRequest, res: Response) => {
   try {
-    const { status, coach, student, batch, dateFrom, dateTo, page = '1', limit = '20' } = req.query;
+    const { status, classType, coach, student, batch, dateFrom, dateTo, page = '1', limit = '20' } = req.query;
     
     const filter: any = {};
     
@@ -133,6 +133,8 @@ export const getClasses = async (req: AuthRequest, res: Response) => {
     const sanitizedStudent = sanitizeQueryParam(student);
     
     if (sanitizedStatus) filter.status = sanitizedStatus;
+    const sanitizedClassType = sanitizeQueryParam(classType);
+    if (sanitizedClassType) filter.classType = sanitizedClassType;
     if (req.user?.role === 'coach') filter.coach = req.user.userId;
     else if (sanitizedCoach) filter.coach = sanitizedCoach;
     if (sanitizedStudent) filter.students = sanitizedStudent;
@@ -145,7 +147,7 @@ export const getClasses = async (req: AuthRequest, res: Response) => {
     if (sanitizedDateFrom || sanitizedDateTo) {
       filter.date = {};
       if (sanitizedDateFrom) filter.date.$gte = new Date(sanitizedDateFrom);
-      if (sanitizedDateTo) filter.date.$lte = new Date(sanitizedDateTo);
+      if (sanitizedDateTo) filter.date.$lte = new Date(`${sanitizedDateTo}T23:59:59.999Z`);
     }
 
     const { page: pageNum, limit: limitNum } = sanitizePaginationParams(page, limit);

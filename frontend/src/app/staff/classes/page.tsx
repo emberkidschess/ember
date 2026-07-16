@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, Search, Calendar, Clock, CheckCircle, Video, MessageCircle } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import StatusBadge from "@/components/admin/StatusBadge";
@@ -34,12 +34,13 @@ export default function StaffClassesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [now, setNow] = useState(() => new Date());
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getClasses({ status: "scheduled" });
+      const data = await getClasses({ classType: "regular", dateFrom: selectedDate, dateTo: selectedDate, limit: 100 });
       if (data.success) {
         setClasses(data.data || []);
       } else {
@@ -50,11 +51,11 @@ export default function StaffClassesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -93,7 +94,7 @@ export default function StaffClassesPage() {
     <div>
       <PageHeader
         title="Classes"
-        description="View and manage scheduled classes"
+        description="View regular classes scheduled for one day"
       />
 
       {error && (
@@ -103,6 +104,7 @@ export default function StaffClassesPage() {
       )}
 
       <div className="admin-toolbar">
+        <label className="text-xs font-semibold text-[var(--color-muted)]">Classes for<input type="date" className="admin-control mt-1" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} /></label>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]" />
           <input
@@ -167,7 +169,7 @@ export default function StaffClassesPage() {
           </tbody>
         </table>
         {filteredClasses.length === 0 && (
-          <div className="admin-empty">No classes found</div>
+          <div className="admin-empty">No regular classes are scheduled for this day.</div>
         )}
       </div>
     </div>
