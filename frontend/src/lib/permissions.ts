@@ -70,6 +70,13 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "export_report_card", label: "Export Report Card" },
     ],
   },
+  {
+    group: "Academy Events & Reports",
+    permissions: [
+      { key: "manage_academy_events", label: "Manage Masterclasses & Tournaments" },
+      { key: "view_coach_reports", label: "View Coach Reports" },
+    ],
+  },
 ];
 
 export const ALL_PERMISSION_KEYS = PERMISSION_GROUPS.flatMap((g) => g.permissions.map((p) => p.key));

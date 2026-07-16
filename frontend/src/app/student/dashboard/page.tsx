@@ -26,12 +26,14 @@ import {
   PackageCheck,
   RefreshCw,
   Send,
+  Trophy,
   UserRound,
   Video,
   X,
 } from "lucide-react";
 import {
   getStudentDashboard,
+  joinAcademyEvent,
   joinClass,
   raiseAttendanceDispute,
   submitHelpRequest,
@@ -54,6 +56,7 @@ const BUTTON_STYLES = {
 const BACKGROUND = "bg-gradient-to-br from-[#f8faf9] via-[#f3f6f4] to-[#eef1ef]";
 
 type UpcomingClass = StudentDashboardData["upcomingClasses"][number];
+type AcademyEvent = StudentDashboardData["academyEvents"][number];
 type AttendanceItem = StudentDashboardData["recentAttendance"][number];
 type Notice = { tone: "success" | "error" | "info"; message: string };
 
@@ -61,6 +64,7 @@ const navigation = [
   { id: "overview", href: "#overview", label: "Overview", icon: LayoutDashboard },
   { id: "profile", href: "#profile", label: "Profile", icon: UserRound },
   { id: "classes", href: "#classes", label: "Classes", icon: CalendarDays },
+  { id: "events", href: "#events", label: "Academy Events", icon: Trophy },
   { id: "attendance", href: "#attendance", label: "Attendance", icon: History },
   { id: "report", href: "#report", label: "Report", icon: FileText },
   { id: "help", href: "#help", label: "Help & Support", icon: HelpCircle },
@@ -299,6 +303,97 @@ function JoinButton({
   );
 }
 
+function EventJoinButton({
+  event,
+  now,
+  portalLimited,
+  joining,
+  onJoin,
+}: {
+  event: AcademyEvent;
+  now: Date | null;
+  portalLimited: boolean;
+  joining: boolean;
+  onJoin: (event: AcademyEvent) => void;
+}) {
+  if (!now || event.status !== "scheduled") return null;
+  const opensAt = new Date(event.accessOpensAt);
+  const closesAt = new Date(event.joinClosesAt);
+  if (now < opensAt || now > closesAt) return null;
+  const enabled = !portalLimited && event.hasMeetingLink && event.canJoin;
+  return (
+    <button
+      type="button"
+      onClick={() => onJoin(event)}
+      disabled={!enabled || joining}
+      className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition ${
+        enabled
+          ? "bg-[#d96745] text-white hover:bg-[#b95032]"
+          : "cursor-not-allowed border border-[#d9dfdc] bg-[#f0f3f1] text-[#77837e]"
+      }`}
+    >
+      {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+      {joining ? "Opening" : enabled ? "Join now" : "Link pending"}
+    </button>
+  );
+}
+
+function AcademyEventsSection({
+  events,
+  now,
+  portalLimited,
+  joiningEventId,
+  onJoin,
+  compact = false,
+}: {
+  events: AcademyEvent[];
+  now: Date | null;
+  portalLimited: boolean;
+  joiningEventId: string | null;
+  onJoin: (event: AcademyEvent) => void;
+  compact?: boolean;
+}) {
+  return (
+    <section id={compact ? undefined : "events"} className={`${CARD_STYLES.list} overflow-hidden`}>
+      <div className="flex items-center justify-between border-b border-[#e5eae7] px-6 py-5">
+        <div>
+          <h2 className="font-bold">Masterclasses & Tournaments</h2>
+          <p className="mt-0.5 text-sm text-[#75817c]">Events matched automatically to your running batch.</p>
+        </div>
+        <Trophy className="h-5 w-5 text-[#b07a1f]" />
+      </div>
+      {events.length === 0 ? (
+        <div className="px-6 py-10 text-center">
+          <Trophy className="mx-auto h-9 w-9 text-[#a9b2ae]" />
+          <p className="mt-3 font-semibold">No academy events scheduled</p>
+          <p className="mt-1 text-sm text-[#75817c]">Eligible events will appear here automatically.</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-[#e8ecea]">
+          {events.map((event) => (
+            <article key={event._id} className="grid gap-4 px-6 py-5 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center hover:bg-[#f8faf9] transition">
+              <div className="flex h-16 w-16 flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#fff1c9] to-[#f5e6e0] text-[#a56c1d] shadow-sm">
+                <span className="text-[10px] font-bold uppercase">{formatMonth(event.date)}</span>
+                <span className="text-2xl font-bold">{formatDayNumber(event.date)}</span>
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold">{event.name}</h3>
+                  <span className="rounded-full bg-[#fff5d9] px-2.5 py-1 text-[11px] font-semibold text-[#92651c]">{titleCase(event.type)}</span>
+                  {event.level && <span className="rounded-full bg-[#f1f3f2] px-2.5 py-1 text-[11px] font-semibold text-[#66736e]">{event.level}</span>}
+                </div>
+                <p className="mt-1 text-sm text-[#66736e]">{formatClassDate(event.date)} at {formatTime(event.startTime)} · {event.timezone}</p>
+                <p className="mt-1 text-xs text-[#85908b]">{event.coach?.name || "Academy event"}</p>
+              </div>
+              <EventJoinButton event={event} now={now} portalLimited={portalLimited} joining={joiningEventId === event._id} onJoin={onJoin} />
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function DashboardSkeleton() {
   return (
     <div className="min-h-dvh bg-[#f3f6f4]">
@@ -337,6 +432,7 @@ export default function StudentDashboardPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [joiningClassId, setJoiningClassId] = useState<string | null>(null);
+  const [joiningEventId, setJoiningEventId] = useState<string | null>(null);
   const [disputeAttendanceId, setDisputeAttendanceId] = useState<string | null>(null);
   const [disputeReason, setDisputeReason] = useState("");
   const [submittingDispute, setSubmittingDispute] = useState(false);
@@ -356,7 +452,11 @@ export default function StudentDashboardPage() {
       const boundaries = (dashboard?.upcomingClasses || [])
         .flatMap((classItem) => [Date.parse(classItem.joinOpensAt), Date.parse(classItem.joinClosesAt)])
         .filter((timestamp) => Number.isFinite(timestamp) && timestamp > current.getTime());
-      const nextBoundary = boundaries.length > 0 ? Math.min(...boundaries) : undefined;
+      const eventBoundaries = (dashboard?.academyEvents || [])
+        .flatMap((event) => [Date.parse(event.accessOpensAt), Date.parse(event.joinClosesAt)])
+        .filter((timestamp) => Number.isFinite(timestamp) && timestamp > current.getTime());
+      const nextBoundaryValues = [...boundaries, ...eventBoundaries];
+      const nextBoundary = nextBoundaryValues.length > 0 ? Math.min(...nextBoundaryValues) : undefined;
       timer = window.setTimeout(tick, nextBoundary
         ? Math.min(30_000, Math.max(250, nextBoundary - current.getTime() + 50))
         : 30_000);
@@ -471,6 +571,31 @@ export default function StudentDashboardPage() {
       });
     } finally {
       setJoiningClassId(null);
+    }
+  };
+
+  const handleJoinEvent = async (event: AcademyEvent) => {
+    setNotice(null);
+    setJoiningEventId(event._id);
+    let meetingWindow: Window | null = null;
+    try {
+      meetingWindow = window.open("about:blank", "_blank");
+      if (meetingWindow) meetingWindow.opener = null;
+      const response = await joinAcademyEvent(event._id);
+      const meetingLink = response.data?.meetingLink;
+      if (!response.success || !meetingLink) {
+        meetingWindow?.close();
+        setNotice({ tone: "error", message: response.error || "The event link is not available yet." });
+        return;
+      }
+      setNotice({ tone: "success", message: response.message || "The event is opening now." });
+      if (meetingWindow) meetingWindow.location.replace(meetingLink);
+      else window.location.assign(meetingLink);
+    } catch (joinError) {
+      meetingWindow?.close();
+      setNotice({ tone: "error", message: joinError instanceof Error ? joinError.message : "Could not join this event." });
+    } finally {
+      setJoiningEventId(null);
     }
   };
 
@@ -601,6 +726,7 @@ export default function StudentDashboardPage() {
     recentAttendance,
     latestEvaluation,
     attendanceRate,
+    academyEvents,
   } = dashboard;
   const portalStatus = student.portalStatus || "active";
   const isPortalLimited = portalStatus === "frozen" || portalStatus === "expired";
@@ -748,6 +874,7 @@ export default function StudentDashboardPage() {
                   <p className="mt-1 text-sm text-[#68756f]">
                     {activeSection === "overview" && "Your next class, progress, and recent feedback in one place."}
                     {activeSection === "classes" && "View your upcoming scheduled classes and join when it's time."}
+                    {activeSection === "events" && "Join Masterclasses and Tournaments available for your batch."}
                     {activeSection === "attendance" && "Review your class attendance history and coach notes."}
                     {activeSection === "report" && "Your latest progress report and evaluation from your coach."}
                     {activeSection === "profile" && "Your personal information and academy record."}
@@ -1057,6 +1184,12 @@ export default function StudentDashboardPage() {
           </div>
           )}
 
+          {activeSection === "events" && (
+            <section id="events" className="space-y-6">
+              <AcademyEventsSection events={academyEvents} now={now} portalLimited={isPortalLimited} joiningEventId={joiningEventId} onJoin={handleJoinEvent} />
+            </section>
+          )}
+
           {activeSection === "overview" && (
           <div className="mt-6 space-y-6">
             {/* Upcoming Classes (Collapsed) */}
@@ -1130,6 +1263,9 @@ export default function StudentDashboardPage() {
             </section>
 
             {/* Package Details */}
+            <AcademyEventsSection events={academyEvents.slice(0, 3)} now={now} portalLimited={isPortalLimited} joiningEventId={joiningEventId} onJoin={handleJoinEvent} compact />
+
+            {/* Package Details */}
             <section className={`${CARD_STYLES.info} p-6`}>
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
@@ -1182,6 +1318,12 @@ export default function StudentDashboardPage() {
                       <dt className="text-xs font-medium text-[#75817c]">WhatsApp group</dt>
                       <dd className="mt-1 text-sm font-semibold">
                         {whatsappGroupLink ? <a href={whatsappGroupLink} target="_blank" rel="noreferrer" className="text-[#e04a15] hover:underline">Open group</a> : "Not available"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium text-[#75817c]">Batch class link</dt>
+                      <dd className="mt-1 text-sm font-semibold">
+                        {currentBatch?.classLink ? <a href={currentBatch.classLink} target="_blank" rel="noreferrer" className="text-[#e04a15] hover:underline">Open class link</a> : "Available during class"}
                       </dd>
                     </div>
                   </dl>

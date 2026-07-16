@@ -10,6 +10,7 @@ import {
 } from '../domain/courseEnrollment';
 
 const courseLevelSchema = z.enum(COURSE_LEVELS);
+const eventCountrySchema = z.enum(['US', 'CA', 'IN', 'SA', 'AE', 'QA', 'KW', 'BH', 'OM']);
 const sessionPlanSchema = z.enum(
   SESSION_PLAN_OPTIONS.map((size) => PLAN_LABELS[size]) as [
     string,
@@ -144,6 +145,7 @@ export const createStaffSchema = z.object({
   expertise: z.array(z.string()).optional(),
   permissions: z.array(z.enum(STAFF_PERMISSIONS)).optional(),
   salaryPerClass: z.number().optional(),
+  defaultClassLink: z.url().refine((value) => /^https?:\/\//i.test(value), 'Default class link must use HTTP or HTTPS'),
 });
 
 export const updateStaffSchema = createStaffSchema.partial();
@@ -160,7 +162,7 @@ export const createClassSchema = z.object({
   endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   timezone: z.enum(SUPPORTED_TIMEZONES).optional(),
   meetingLink: z.url().optional().or(z.literal('')),
-  classType: z.enum(['regular', 'extra', 'trial']).optional(),
+  classType: z.enum(['regular', 'master', 'extra', 'trial', 'demo']).optional(),
   accessOpensMinutesBefore: z.number().int().min(5).max(10).optional(),
   extraClassReason: z.string().trim().max(1000).optional(),
   notes: z.string().optional(),
@@ -195,7 +197,9 @@ export const createBatchSchema = z.object({
   accessOpensMinutesBefore: z.number().int().min(5).max(10).optional(),
   timezone: z.enum(SUPPORTED_TIMEZONES),
   startDate: z.iso.date(),
-  meetingLink: z.url().refine((value) => /^https?:\/\//i.test(value), 'Meeting link must use HTTP or HTTPS'),
+  // Accepted for backwards-compatible API clients, but the controller always
+  // replaces it with the selected staff member's defaultClassLink.
+  meetingLink: z.url().refine((value) => /^https?:\/\//i.test(value), 'Meeting link must use HTTP or HTTPS').optional(),
   notes: z.string().optional(),
   whatsappCommunityLink: z.url().refine(
     (value) => /^https?:\/\//i.test(value),
@@ -204,6 +208,30 @@ export const createBatchSchema = z.object({
 });
 
 export const updateBatchSchema = createBatchSchema.partial();
+
+// Academy events resolve their target batches on the server. Batch IDs are
+// intentionally absent so the client cannot bypass the eligibility rules.
+const academyEventBaseSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  country: eventCountrySchema,
+  timezone: z.enum(SUPPORTED_TIMEZONES),
+  date: z.iso.date(),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  durationMinutes: z.number().int().min(15).max(480).optional(),
+  meetingLink: z.url().refine((value) => /^https?:\/\//i.test(value), 'Meeting link must use HTTP or HTTPS'),
+});
+
+export const createMasterclassSchema = academyEventBaseSchema.extend({
+  coach: z.string().min(1),
+  level: courseLevelSchema,
+});
+
+export const createTournamentSchema = academyEventBaseSchema;
+
+export const updateAcademyEventSchema = academyEventBaseSchema.partial().extend({
+  coach: z.string().min(1).optional(),
+  level: courseLevelSchema.optional(),
+});
 
 export const renameBatchSchema = z.object({
   name: z.string().min(1),

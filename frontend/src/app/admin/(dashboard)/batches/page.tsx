@@ -63,7 +63,6 @@ type BatchFormState = {
   durationUnit: "minutes" | "hours";
   accessOpensMinutesBefore: number;
   startDate: string;
-  meetingLink: string;
   notes: string;
   whatsappCommunityLink: string;
 };
@@ -80,7 +79,6 @@ const EMPTY_FORM: BatchFormState = {
   durationUnit: "minutes",
   accessOpensMinutesBefore: 10,
   startDate: "",
-  meetingLink: "",
   notes: "",
   whatsappCommunityLink: "",
 };
@@ -151,7 +149,7 @@ export default function BatchesPage() {
   const [renameSaving, setRenameSaving] = useState(false);
 
   const [editTarget, setEditTarget] = useState<Batch | null>(null);
-  const [editForm, setEditForm] = useState({ coach: "", meetingLink: "", whatsappCommunityLink: "", notes: "" });
+  const [editForm, setEditForm] = useState({ coach: "", whatsappCommunityLink: "", notes: "" });
   const [editSaving, setEditSaving] = useState(false);
 
   const [statusTarget, setStatusTarget] = useState<Batch | null>(null);
@@ -218,6 +216,11 @@ export default function BatchesPage() {
       setFormError("Select at least one weekday for the recurring schedule.");
       return;
     }
+    const selectedCoach = coaches.find((coach) => coach._id === form.coach);
+    if (!selectedCoach?.defaultClassLink) {
+      setFormError("Selected coach must have a Default Class Link before a batch can be created.");
+      return;
+    }
     const classDurationMinutes = durationInMinutes(form.durationValue, form.durationUnit);
     if (classDurationMinutes < 15 || classDurationMinutes > 480) {
       setFormError("Class duration must be between 15 minutes and 8 hours.");
@@ -237,7 +240,6 @@ export default function BatchesPage() {
         classDurationMinutes,
         accessOpensMinutesBefore: form.accessOpensMinutesBefore,
         startDate: form.startDate,
-        meetingLink: form.meetingLink,
         whatsappCommunityLink: form.whatsappCommunityLink,
         notes: form.notes || undefined,
       };
@@ -278,7 +280,6 @@ export default function BatchesPage() {
     try {
       const res = await updateBatch(editTarget._id, {
         coach: editForm.coach || undefined,
-        meetingLink: editForm.meetingLink || undefined,
         whatsappCommunityLink: editForm.whatsappCommunityLink || undefined,
         notes: editForm.notes || undefined,
       });
@@ -515,7 +516,6 @@ export default function BatchesPage() {
                                 setEditTarget(batch);
                                 setEditForm({
                                   coach: typeof batch.coach === "object" ? batch.coach._id : "",
-                                  meetingLink: batch.meetingLink || "",
                                   whatsappCommunityLink: batch.whatsappCommunityLink || "",
                                   notes: batch.notes || "",
                                 });
@@ -592,7 +592,7 @@ export default function BatchesPage() {
           <FormField label="Assign Coach" required>
             <select required value={form.coach} onChange={(e) => setForm({ ...form, coach: e.target.value })} className={selectClass}>
               <option value="">— Select coach —</option>
-              {coaches.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+              {coaches.map((c) => <option key={c._id} value={c._id} disabled={!c.defaultClassLink || c.status !== "active"}>{c.name}{c.status !== "active" ? " (inactive)" : !c.defaultClassLink ? " (default link missing)" : ""}</option>)}
             </select>
           </FormField>
 
@@ -652,11 +652,6 @@ export default function BatchesPage() {
             <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={textareaClass} rows={2} />
           </FormField>
 
-          <FormField label="Meeting Link" required>
-            <input required type="url" value={form.meetingLink} onChange={(e) => setForm({ ...form, meetingLink: e.target.value })} className={inputClass} placeholder="https://meet.google.com/..." />
-            <p className="text-xs text-[var(--color-muted)] mt-1">Used automatically for every recurring class unless that class is edited.</p>
-          </FormField>
-
           <FormField label="WhatsApp Group Link" required>
             <input 
               required
@@ -705,12 +700,8 @@ export default function BatchesPage() {
           <FormField label="Assign Coach">
             <select value={editForm.coach} onChange={(e) => setEditForm({ ...editForm, coach: e.target.value })} className={selectClass}>
               <option value="">— Keep current —</option>
-              {coaches.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+              {coaches.map((c) => <option key={c._id} value={c._id} disabled={!c.defaultClassLink || c.status !== "active"}>{c.name}{c.status !== "active" ? " (inactive)" : !c.defaultClassLink ? " (default link missing)" : ""}</option>)}
             </select>
-          </FormField>
-          <FormField label="Default Meeting Link">
-            <input type="url" value={editForm.meetingLink} onChange={(e) => setEditForm({ ...editForm, meetingLink: e.target.value })} className={inputClass} />
-            <p className="mt-1 text-xs text-[var(--color-muted)]">Updates future generated classes that still use the batch link.</p>
           </FormField>
           <FormField label="WhatsApp Group Link">
             <input type="url" value={editForm.whatsappCommunityLink} onChange={(e) => setEditForm({ ...editForm, whatsappCommunityLink: e.target.value })} className={inputClass} />

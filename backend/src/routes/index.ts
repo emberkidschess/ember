@@ -24,6 +24,8 @@ import exportRoutes from './exportRoutes';
 import testRoutes from './testRoutes';
 import packageRoutes from './packageRoutes';
 import evaluationReportRoutes from './evaluationReportRoutes';
+import academyEventRoutes from './academyEventRoutes';
+import reportRoutes from './reportRoutes';
 import { csrfProtection, validateCSRFToken } from '../middleware/csrf';
 
 const router = Router();
@@ -58,6 +60,10 @@ router.use('/payment-links', validateCSRFToken, paymentLinkRoutes);
 router.use('/packages', validateCSRFToken, packageRoutes);
 
 router.use('/evaluation-reports', validateCSRFToken, evaluationReportRoutes);
+
+router.use('/events', validateCSRFToken, academyEventRoutes);
+
+router.use('/reports', validateCSRFToken, reportRoutes);
 
 router.use('/salary', validateCSRFToken, salaryRoutes);
 

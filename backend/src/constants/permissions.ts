@@ -43,6 +43,8 @@ export const STAFF_PERMISSIONS = [
   'override_attendance',
   // Class Notes Hub - coach posts homework/notes broadcast to the batch
   'post_class_notes',
+  'manage_academy_events',
+  'view_coach_reports',
   // Parent-Teacher Meeting scheduling
 ] as const;
 

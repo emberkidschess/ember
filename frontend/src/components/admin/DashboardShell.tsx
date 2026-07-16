@@ -17,6 +17,7 @@ import {
   Layers,
   FileText,
   GraduationCap,
+  Trophy,
 } from "lucide-react";
 import { getCurrentUser, logout, isAdminRole, hasPermission, verifySession, type AuthUser } from "@/lib/auth";
 
@@ -46,6 +47,9 @@ const ADMIN_NAV_GROUPS: NavGroup[] = [
       { href: "/admin/leads", icon: UserCheck, label: "Leads" },
       { href: "/admin/batches", icon: Layers, label: "Batches" },
       { href: "/admin/trial-classes", icon: UserCheck, label: "Trial Classes" },
+      { href: "/admin/masterclasses", icon: Trophy, label: "Masterclasses" },
+      { href: "/admin/tournaments", icon: Trophy, label: "Tournaments" },
+      { href: "/admin/reports", icon: FileText, label: "Coach Reports" },
       { href: "/admin/attendance-disputes", icon: AlertCircle, label: "Attendance Disputes" },
       { href: "/admin/payment-links", icon: CreditCard, label: "Payment Links" },
       { href: "/admin/packages", icon: FileText, label: "Packages" },
@@ -70,6 +74,7 @@ const STAFF_NAV_GROUPS: NavGroup[] = [
       { href: "/staff/batches", icon: Layers, label: "Batches", requiredAnyPermissions: ["schedule_classes", "create_edit_class", "assign_students_to_class", "assign_staff_to_class", "enroll_student"] },
       { href: "/staff/classes", icon: GraduationCap, label: "Classes", requiredAnyPermissions: ["schedule_classes", "create_edit_class", "assign_students_to_class", "assign_staff_to_class", "reschedule_class", "cancel_class", "post_class_notes"] },
       { href: "/staff/report-cards", icon: FileText, label: "Report Cards", requiredAnyPermissions: ["view_students", "create_report_card", "export_report_card"] },
+      { href: "/staff/reports", icon: FileText, label: "Coach Reports", requiredAnyPermissions: ["view_coach_reports", "view_students", "schedule_classes"] },
     ],
   },
 ];

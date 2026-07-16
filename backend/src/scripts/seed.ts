@@ -67,6 +67,7 @@ const seedDatabase = async () => {
       status: StaffStatus.ACTIVE,
       expertise: ['Beginner Chess', 'Intermediate Chess'],
       salaryPerClass: 0,
+      defaultClassLink: 'https://meet.google.com/emberkids-demo',
     });
     await StaffAuth.create({
       email: 'staff@emberkids.com',

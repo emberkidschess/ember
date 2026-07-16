@@ -55,6 +55,7 @@ export interface StudentDashboardData {
     classStartTime?: string;
     classDurationMinutes?: number;
     accessOpensMinutesBefore?: number;
+    classLink?: string;
     coach?: { name: string };
   } | null;
   packageHistory: {
@@ -70,7 +71,7 @@ export interface StudentDashboardData {
   upcomingClasses: {
     _id: string;
     course: string;
-    classType: string;
+    classType: "regular" | "master" | "extra" | "trial" | "demo" | string;
     date: string;
     startTime: string;
     endTime: string;
@@ -81,6 +82,24 @@ export interface StudentDashboardData {
     startsAt: string;
     joinClosesAt: string;
     coach?: { name: string; email: string };
+  }[];
+  academyEvents: {
+    _id: string;
+    type: "masterclass" | "tournament";
+    name: string;
+    country: string;
+    timezone: string;
+    level?: string;
+    date: string;
+    startTime: string;
+    durationMinutes: number;
+    status: string;
+    hasMeetingLink: boolean;
+    canJoin: boolean;
+    accessOpensAt: string;
+    startsAt: string;
+    joinClosesAt: string;
+    coach?: { name: string; email?: string };
   }[];
   recentAttendance: {
     _id: string;
@@ -107,7 +126,7 @@ export const getStudentDashboard = () =>
 export interface StudentClassItem {
   _id: string;
   course: string;
-  classType: string;
+  classType: "regular" | "master" | "extra" | "trial" | "demo" | string;
   date: string;
   startTime: string;
   endTime: string;
@@ -138,6 +157,17 @@ export const joinClass = (classId: string) =>
       method: "POST",
       body: JSON.stringify({ classId }),
     });
+
+export const joinAcademyEvent = (eventId: string) =>
+  studentFetchJSON<{
+    success: boolean;
+    data?: { meetingLink?: string };
+    message?: string;
+    error?: string;
+  }>(`/events/${eventId}/join`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 
 export const raiseAttendanceDispute = (attendanceId: string, disputeReason: string) =>
   studentFetchJSON<{ success: boolean; message?: string; error?: string }>(`/attendance/${attendanceId}/dispute`, {

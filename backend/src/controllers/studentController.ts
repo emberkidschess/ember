@@ -592,7 +592,7 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
     const Batch = (await import('../models/Batch')).default;
     let currentBatch = student.currentBatchId
       ? await Batch.findById(student.currentBatchId)
-          .select('name courseLevel status schedule timezone coach totalSessions sessionsCompleted whatsappCommunityLink classStartTime classDurationMinutes accessOpensMinutesBefore')
+          .select('name courseLevel status schedule timezone coach totalSessions sessionsCompleted whatsappCommunityLink classStartTime classDurationMinutes accessOpensMinutesBefore meetingLink')
           .populate('coach', 'name')
       : null;
     if (!currentBatch) {
@@ -600,7 +600,7 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
         students: studentProfileId,
         status: { $in: ['upcoming', 'ongoing'] },
       })
-        .select('name courseLevel status schedule timezone coach totalSessions sessionsCompleted whatsappCommunityLink classStartTime classDurationMinutes accessOpensMinutesBefore')
+        .select('name courseLevel status schedule timezone coach totalSessions sessionsCompleted whatsappCommunityLink classStartTime classDurationMinutes accessOpensMinutesBefore meetingLink')
         .populate('coach', 'name')
         .sort({ createdAt: -1 });
     }
@@ -672,6 +672,8 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
       student: studentProfileId,
       status: PaymentLinkStatus.WAITING_FOR_ACTIVATION,
     });
+    const { getStudentEventView } = await import('../services/academyEventService');
+    const academyEvents = await getStudentEventView(studentProfileId.toString());
 
     res.json({
       success: true,
@@ -720,6 +722,7 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
           classStartTime: currentBatch.classStartTime,
           classDurationMinutes: currentBatch.classDurationMinutes,
           accessOpensMinutesBefore: currentBatch.accessOpensMinutesBefore ?? 10,
+          classLink: student.portalStatus === PortalStatus.ACTIVE ? currentBatch.meetingLink : undefined,
           coach:
             currentBatch.coach && typeof currentBatch.coach === 'object' && 'name' in currentBatch.coach
               ? { name: (currentBatch.coach as any).name }
@@ -759,6 +762,7 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
               : undefined,
           };
         }),
+        academyEvents,
         recentAttendance: recentAttendance.map((attendanceItem: any) => ({
           _id: attendanceItem._id.toString(),
           status: attendanceItem.status,

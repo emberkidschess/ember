@@ -8,6 +8,9 @@ import AuditLog, { AuditAction, AuditEntityType } from '../models/AuditLog';
 import crypto from 'crypto';
 import { buildAuditLogData } from '../middleware/auditLogger';
 import emailService from '../services/emailService';
+import Batch from '../models/Batch';
+import Class from '../models/Class';
+import { CacheService, CacheNamespaces } from '../utils/cache';
 
 export const getStaff = async (req: AuthRequest, res: Response) => {
   try {
@@ -33,8 +36,8 @@ export const getStaff = async (req: AuthRequest, res: Response) => {
 
     const staff = await Staff.find(filter)
       .select(isAdmin
-        ? 'name email role status expertise permissions salaryPerClass createdAt'
-        : 'name email role status expertise createdAt')
+        ? 'name email role status expertise permissions salaryPerClass defaultClassLink createdAt'
+        : 'name email role status expertise defaultClassLink createdAt')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -47,6 +50,7 @@ export const getStaff = async (req: AuthRequest, res: Response) => {
       status: s.status,
       expertise: s.expertise || [],
       ...(isAdmin ? { permissions: s.permissions || [], salaryPerClass: s.salaryPerClass } : {}),
+      defaultClassLink: s.defaultClassLink || '',
       createdAt: s.createdAt,
     }));
 
@@ -95,7 +99,7 @@ export const getStaffById = async (req: AuthRequest, res: Response) => {
 
 export const createStaff = async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password, name, role, expertise, permissions, salaryPerClass } = req.body;
+    const { email, password, name, role, expertise, permissions, salaryPerClass, defaultClassLink } = req.body;
     const ipAddress = req.ipAddress || 'unknown';
     const userAgent = req.userAgent || 'unknown';
 
@@ -118,6 +122,7 @@ export const createStaff = async (req: AuthRequest, res: Response) => {
       expertise: Array.isArray(expertise) ? expertise : [],
       permissions: Array.isArray(permissions) ? permissions : [],
       salaryPerClass: typeof salaryPerClass === 'number' ? salaryPerClass : 0,
+      defaultClassLink,
       createdBy: req.user?.userId,
     });
 
@@ -158,6 +163,7 @@ export const createStaff = async (req: AuthRequest, res: Response) => {
         status: staff.status,
         expertise: staff.expertise,
         permissions: staff.permissions,
+        defaultClassLink: staff.defaultClassLink,
         createdAt: staff.createdAt,
         lastLogin: staff.createdAt,
         tempPassword: !password ? tempPassword : undefined,
@@ -175,7 +181,7 @@ export const createStaff = async (req: AuthRequest, res: Response) => {
 
 export const updateStaff = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, email, role, status, expertise, salaryPerClass, permissions } = req.body;
+    const { name, email, role, status, expertise, salaryPerClass, permissions, defaultClassLink } = req.body;
     const ipAddress = req.ipAddress || 'unknown';
     const userAgent = req.userAgent || 'unknown';
 
@@ -206,6 +212,7 @@ export const updateStaff = async (req: AuthRequest, res: Response) => {
     if (Array.isArray(expertise)) updates.expertise = expertise;
     if (typeof salaryPerClass === 'number') updates.salaryPerClass = salaryPerClass;
     if (Array.isArray(permissions)) updates.permissions = permissions;
+    if (defaultClassLink !== undefined) updates.defaultClassLink = defaultClassLink;
 
     const permissionsChanged = Array.isArray(permissions)
       && JSON.stringify([...(staff.permissions || [])].sort()) !== JSON.stringify([...permissions].sort());
@@ -230,6 +237,20 @@ export const updateStaff = async (req: AuthRequest, res: Response) => {
         success: false,
         error: 'Staff not found',
       });
+    }
+
+    if (defaultClassLink !== undefined && defaultClassLink !== staff.defaultClassLink) {
+      await Promise.all([
+        Batch.updateMany(
+          { coach: staff._id },
+          { $set: { meetingLink: defaultClassLink } }
+        ),
+        Class.updateMany(
+          { coach: staff._id, meetingLinkSource: 'batch', status: 'scheduled' },
+          { $set: { meetingLink: defaultClassLink } }
+        ),
+        CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`),
+      ]);
     }
 
     if (email && email !== staff.email) {
@@ -441,6 +462,7 @@ export const toggleStaffStatus = async (req: AuthRequest, res: Response) => {
       expertise: staff.expertise || [],
       permissions: staff.permissions || [],
       salaryPerClass: staff.salaryPerClass,
+      defaultClassLink: staff.defaultClassLink,
       createdAt: staff.createdAt,
     };
 

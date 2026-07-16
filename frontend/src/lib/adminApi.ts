@@ -71,6 +71,70 @@ export const getAdminDashboard = () => adminFetchJSON<ApiItemResponse<DashboardD
 export const getStaffDashboard = () => adminFetchJSON<ApiItemResponse<DashboardData>>("/dashboard/staff");
 export const getAuditLogs = () => adminFetchJSON<ApiListResponse<AuditLogEntry>>("/dashboard/audit-logs");
 
+// ---------- Academy events ----------
+
+export type AcademyEventType = "masterclass" | "tournament";
+
+export interface AcademyEvent {
+  _id: string;
+  type: AcademyEventType;
+  name: string;
+  country: string;
+  timezone: string;
+  date: string;
+  startTime: string;
+  durationMinutes: number;
+  coach?: { _id: string; name: string; email?: string };
+  level?: "Beginner" | "Intermediate" | "Advanced" | "Expert";
+  meetingLink?: string;
+  status: "scheduled" | "completed" | "cancelled";
+  eligibleBatchCount?: number;
+  accessOpensAt?: string;
+  startsAt?: string;
+  joinClosesAt?: string;
+  createdAt?: string;
+}
+
+export interface AcademyEventPayload {
+  name: string;
+  country: string;
+  timezone: string;
+  date: string;
+  startTime: string;
+  durationMinutes?: number;
+  meetingLink: string;
+  coach?: string;
+  level?: string;
+}
+
+export const getAcademyEvents = (type: AcademyEventType, params?: { country?: string; timezone?: string; coach?: string; level?: string; date?: string; status?: string }) =>
+  adminFetchJSON<ApiListResponse<AcademyEvent>>(`/events/${type}${toQueryString(params)}`);
+export const createMasterclass = (payload: AcademyEventPayload) =>
+  adminFetchJSON<ApiItemResponse<AcademyEvent>>("/events/masterclass", { method: "POST", body: JSON.stringify(payload) });
+export const createTournament = (payload: AcademyEventPayload) =>
+  adminFetchJSON<ApiItemResponse<AcademyEvent>>("/events/tournament", { method: "POST", body: JSON.stringify(payload) });
+export const updateAcademyEvent = (type: AcademyEventType, id: string, payload: Partial<AcademyEventPayload>) =>
+  adminFetchJSON<ApiItemResponse<AcademyEvent>>(`/events/${type}/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+export const cancelAcademyEvent = (type: AcademyEventType, id: string) =>
+  adminFetchJSON<ApiItemResponse<AcademyEvent>>(`/events/${type}/${id}/cancel`, { method: "POST" });
+
+export interface CoachReports {
+  summary: {
+    totalClassesConducted: number;
+    totalDemoClasses: number;
+    totalTrialClasses: number;
+    totalMasterclassesConducted: number;
+    totalCoverUpClasses: number;
+  };
+  studentTrialReport: Record<string, unknown>[];
+  batchReport: Record<string, unknown>[];
+  masterclassReport: Record<string, unknown>[];
+  coverUpReport: Record<string, unknown>[];
+}
+
+export const getCoachReports = (params?: { coach?: string; dateFrom?: string; dateTo?: string; country?: string; timezone?: string }) =>
+  adminFetchJSON<ApiItemResponse<CoachReports>>(`/reports/coaches${toQueryString(params)}`);
+
 // ---------- Leads ----------
 
 export interface Lead {
@@ -200,13 +264,14 @@ export interface StaffMember {
   expertise?: string[];
   permissions?: string[];
   salaryPerClass?: number;
+  defaultClassLink?: string;
   createdAt: string;
 }
 
 export const getStaffList = (role?: "coach" | "staff") =>
   adminFetchJSON<ApiListResponse<StaffMember>>(`/staff${role ? `?role=${role}` : ""}`);
 export const getStaffMember = (id: string) => adminFetchJSON<ApiItemResponse<StaffMember>>(`/staff/${id}`);
-export const createStaffMember = (payload: { name: string; email: string; role: string; expertise?: string[]; permissions?: string[] }) =>
+export const createStaffMember = (payload: { name: string; email: string; role: string; expertise?: string[]; permissions?: string[]; salaryPerClass?: number; defaultClassLink: string }) =>
   adminFetchJSON<ApiItemResponse<StaffMember & { tempPassword?: string }>>("/staff", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -314,7 +379,7 @@ export interface Batch {
   nextUpcomingClass?: {
     _id: string;
     course: string;
-    classType: "regular" | "extra";
+    classType: "regular" | "master" | "extra" | "trial" | "demo";
     date: string;
     startTime: string;
     endTime: string;
@@ -391,7 +456,7 @@ export interface ClassItem {
   endTime: string;
   timezone: string;
   meetingLink?: string;
-  classType: "regular" | "extra" | "trial";
+  classType: "regular" | "master" | "extra" | "trial" | "demo";
   status: string;
   notes?: string;
   extraClassReason?: string;

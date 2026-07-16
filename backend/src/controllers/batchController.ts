@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import mongoose from 'mongoose';
 import Batch, { BatchStatus } from '../models/Batch';
+import Staff, { StaffStatus } from '../models/Staff';
 import { AuthRequest } from '../middleware/auth';
 import AuditLog, { AuditAction, AuditEntityType } from '../models/AuditLog';
 import { validateStudent, validateStaff, validateBatch } from '../utils/foreignKeys';
@@ -195,10 +196,22 @@ export const createBatch = async (req: AuthRequest, res: Response) => {
     const {
       name, courseLevel, coach, students, frequencyDays, classStartTime,
       classDurationMinutes, accessOpensMinutesBefore, timezone, startDate,
-      meetingLink, notes, whatsappCommunityLink,
+      notes, whatsappCommunityLink,
     } = req.body;
 
     await validateStaff(coach);
+    const assignedCoach = await Staff.findOne({ _id: coach, status: StaffStatus.ACTIVE })
+      .select('defaultClassLink')
+      .lean();
+    if (!assignedCoach) {
+      return res.status(400).json({ success: false, error: 'Selected staff member is not active' });
+    }
+    if (!assignedCoach.defaultClassLink) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selected staff member must have a default class link before creating a batch',
+      });
+    }
 
     const studentIds: string[] = Array.isArray(students) ? students : [];
     if (studentIds.length > 0) {
@@ -219,7 +232,7 @@ export const createBatch = async (req: AuthRequest, res: Response) => {
         name, courseLevel, coach, students: studentIds,
         schedule: formatRecurringSchedule(frequencyDays, classStartTime, timezone),
         timezone, startDate, automationEnabled: true, frequencyDays,
-        classStartTime, classDurationMinutes, meetingLink,
+        classStartTime, classDurationMinutes, meetingLink: assignedCoach.defaultClassLink,
         accessOpensMinutesBefore: accessOpensMinutesBefore ?? 10,
         notes, whatsappCommunityLink, status: BatchStatus.UPCOMING,
         createdBy: req.user?.userId,
@@ -307,14 +320,27 @@ export const createBatch = async (req: AuthRequest, res: Response) => {
 
 export const updateBatch = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, coach, notes, meetingLink, whatsappCommunityLink } = req.body;
+    const { name, coach, notes, whatsappCommunityLink } = req.body;
 
     const batch = await Batch.findById(req.params.id);
     if (!batch) {
       return res.status(404).json({ success: false, error: 'Batch not found' });
     }
 
-    if (coach) await validateStaff(coach);
+    let nextCoachDefaultLink: string | undefined;
+    if (coach) {
+      await validateStaff(coach);
+      const nextCoach = await Staff.findOne({ _id: coach, status: StaffStatus.ACTIVE })
+        .select('defaultClassLink')
+        .lean();
+      if (!nextCoach?.defaultClassLink) {
+        return res.status(400).json({
+          success: false,
+          error: 'Selected staff member must have a default class link before assigning them to a batch',
+        });
+      }
+      nextCoachDefaultLink = nextCoach.defaultClassLink;
+    }
 
     if (name && name !== batch.name) {
       const existing = await Batch.findOne({ courseLevel: batch.courseLevel, name, _id: { $ne: batch._id } });
@@ -343,17 +369,17 @@ export const updateBatch = async (req: AuthRequest, res: Response) => {
     }
     if (coach) batch.coach = coach;
     if (notes !== undefined) batch.notes = notes;
-    if (meetingLink !== undefined) batch.meetingLink = meetingLink;
+    if (nextCoachDefaultLink) batch.meetingLink = nextCoachDefaultLink;
     if (whatsappCommunityLink !== undefined) batch.whatsappCommunityLink = whatsappCommunityLink;
 
     await batch.save();
 
     const Class = (await import('../models/Class')).default;
     const Attendance = (await import('../models/Attendance')).default;
-    if (meetingLink !== undefined) {
+    if (nextCoachDefaultLink) {
       await Class.updateMany(
         { batch: batch._id, status: 'scheduled', meetingLinkSource: 'batch' },
-        { $set: { meetingLink } }
+        { $set: { meetingLink: nextCoachDefaultLink } }
       );
     }
     if (coach && coach !== previousCoach) {

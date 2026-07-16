@@ -17,6 +17,8 @@ export interface IStaff extends Document {
   status: StaffStatus;
   expertise: string[];
   salaryPerClass: number;
+  /** Default link used for every batch class assigned to this staff member. */
+  defaultClassLink?: string;
   permissions: string[];
   assignedStudents: mongoose.Types.ObjectId[];
   assignedClasses: mongoose.Types.ObjectId[];
@@ -70,6 +72,10 @@ const StaffSchema = new Schema({
   salaryPerClass: {
     type: Number,
     default: 0,
+  },
+  defaultClassLink: {
+    type: String,
+    trim: true,
   },
   permissions: {
     type: [String],

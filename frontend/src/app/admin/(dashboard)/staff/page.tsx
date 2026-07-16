@@ -21,6 +21,7 @@ type StaffFormState = {
   expertise: string[];
   permissions: string[];
   salaryPerClass: number;
+  defaultClassLink: string;
 };
 
 const EMPTY_FORM: StaffFormState = {
@@ -30,6 +31,7 @@ const EMPTY_FORM: StaffFormState = {
   expertise: [],
   permissions: [],
   salaryPerClass: 0,
+  defaultClassLink: "",
 };
 
 export default function StaffPage() {
@@ -85,11 +87,16 @@ export default function StaffPage() {
       expertise: staffMember.expertise || [],
       permissions: staffMember.permissions || [],
       salaryPerClass: staffMember.salaryPerClass || 0,
+      defaultClassLink: staffMember.defaultClassLink || "",
     });
     setModalOpen(true);
   };
 
   const handleSave = async () => {
+    if (!/^https?:\/\//i.test(form.defaultClassLink.trim())) {
+      setError("Enter a valid HTTP or HTTPS Default Class Link before saving.");
+      return;
+    }
     setSaving(true);
     try {
       if (editingStaff) {
@@ -346,6 +353,17 @@ export default function StaffPage() {
               min="0"
               step="0.01"
             />
+          </FormField>
+          <FormField label="Default Class Link" required>
+            <input
+              type="url"
+              required
+              placeholder="https://meet.google.com/..."
+              value={form.defaultClassLink}
+              onChange={(e) => setForm({ ...form, defaultClassLink: e.target.value })}
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-[var(--color-muted)]">This link is automatically used for every batch assigned to this staff member.</p>
           </FormField>
           <FormField label="Expertise">
             <div className="flex flex-wrap gap-2">
