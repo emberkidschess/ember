@@ -49,7 +49,6 @@ const ADMIN_NAV_GROUPS: NavGroup[] = [
       { href: "/admin/trial-classes", icon: UserCheck, label: "Trial Classes" },
       { href: "/admin/masterclasses", icon: Trophy, label: "Masterclasses" },
       { href: "/admin/tournaments", icon: Trophy, label: "Tournaments" },
-      { href: "/admin/reports", icon: FileText, label: "Coach Reports" },
       { href: "/admin/attendance-disputes", icon: AlertCircle, label: "Attendance Disputes" },
       { href: "/admin/payment-links", icon: CreditCard, label: "Payment Links" },
       { href: "/admin/packages", icon: FileText, label: "Packages" },

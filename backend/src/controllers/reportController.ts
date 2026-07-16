@@ -6,8 +6,17 @@ import AcademyEvent, { AcademyEventStatus, AcademyEventType } from '../models/Ac
 import { effectiveEventStatus } from '../services/academyEventService';
 import { sanitizeQueryParam } from '../utils/validation';
 
-function dateFilter(dateFrom: unknown, dateTo: unknown) {
+function dateFilter(dateFrom: unknown, dateTo: unknown, day?: unknown) {
   const filter: Record<string, Date> = {};
+  const selectedDay = sanitizeQueryParam(day);
+  if (selectedDay) {
+    const start = new Date(`${selectedDay}T00:00:00.000Z`);
+    if (!Number.isNaN(start.getTime())) {
+      filter.$gte = start;
+      filter.$lte = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+      return filter;
+    }
+  }
   const from = sanitizeQueryParam(dateFrom);
   const to = sanitizeQueryParam(dateTo);
   if (from) filter.$gte = new Date(from);
@@ -23,7 +32,9 @@ function reportCoach(req: AuthRequest) {
 export const getCoachReports = async (req: AuthRequest, res: Response) => {
   try {
     const coach = reportCoach(req);
+    const reportDay = sanitizeQueryParam(req.query.day);
     const dateRange = dateFilter(req.query.dateFrom, req.query.dateTo);
+    const dailyRange = dateFilter(undefined, undefined, reportDay);
     const timezone = sanitizeQueryParam(req.query.timezone);
     const country = sanitizeQueryParam(req.query.country);
     const classFilter: any = {
@@ -77,7 +88,7 @@ export const getCoachReports = async (req: AuthRequest, res: Response) => {
 
     const batchIds = batchRecords.map((batch: any) => batch._id);
     const batchClasses = batchIds.length
-      ? await Class.find({ batch: { $in: batchIds }, ...(dateRange ? { date: dateRange } : {}) })
+      ? await Class.find({ batch: { $in: batchIds }, classType: 'regular' })
         .select('batch date startTime endTime status classType sessionNumber')
         .sort({ date: 1, startTime: 1 })
         .lean()
@@ -90,22 +101,48 @@ export const getCoachReports = async (req: AuthRequest, res: Response) => {
       classesByBatch.set(key, current);
     }
 
-    const batchReport = batchRecords.map((batch: any) => ({
-      _id: batch._id.toString(),
-      batchName: batch.name,
-      schedule: batch.schedule,
-      completionStatus: batch.status,
-      completedAt: batch.completedAt,
-      classCompletionHistory: (classesByBatch.get(batch._id.toString()) || []).map((item) => ({
-        _id: item._id.toString(),
-        date: item.date,
-        startTime: item.startTime,
-        endTime: item.endTime,
-        classType: item.classType,
-        sessionNumber: item.sessionNumber,
-        status: item.status,
-      })),
-    }));
+    const batchReport = batchRecords.map((batch: any) => {
+      const history = classesByBatch.get(batch._id.toString()) || [];
+      const dailyHistory = dailyRange
+        ? history.filter((item) => {
+          const timestamp = new Date(item.date).getTime();
+          const from = dailyRange.$gte?.getTime();
+          const to = dailyRange.$lte?.getTime();
+          return (from === undefined || timestamp >= from) && (to === undefined || timestamp <= to);
+        })
+        : [];
+      const completedClasses = history.filter((item) => item.status === ClassStatus.COMPLETED).length;
+      return {
+        _id: batch._id.toString(),
+        batchName: batch.name,
+        schedule: batch.schedule,
+        completionStatus: batch.status,
+        completedAt: batch.completedAt,
+        totalScheduledClasses: history.length,
+        totalCompletedClasses: completedClasses,
+        dailyClassCount: reportDay ? dailyHistory.length : 0,
+        dailyClassSchedule: reportDay ? dailyHistory.map((item) => ({
+          _id: item._id.toString(),
+          date: item.date,
+          startTime: item.startTime,
+          endTime: item.endTime,
+          classType: item.classType,
+          sessionNumber: item.sessionNumber,
+          status: item.status,
+        })) : [],
+        // Kept for existing consumers; the UI intentionally renders the daily
+        // schedule separately from this full course-progress history.
+        classCompletionHistory: history.map((item) => ({
+          _id: item._id.toString(),
+          date: item.date,
+          startTime: item.startTime,
+          endTime: item.endTime,
+          classType: item.classType,
+          sessionNumber: item.sessionNumber,
+          status: item.status,
+        })),
+      };
+    });
 
     const masterclassReport = eventRecords
       .filter((event: any) => !country || event.country === country)

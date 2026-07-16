@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarPlus, ExternalLink, Loader2, Pencil, Plus, Trophy, XCircle } from "lucide-react";
+import { CalendarPlus, ExternalLink, Loader2, Pencil, Plus, SlidersHorizontal, Trophy, XCircle } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import Modal from "@/components/admin/Modal";
 import StatusBadge from "@/components/admin/StatusBadge";
@@ -55,6 +55,8 @@ export default function AcademyEventManager({ type, title, description }: { type
   const [editing, setEditing] = useState<AcademyEvent | null>(null);
   const [form, setForm] = useState<EventForm>(() => emptyForm(type));
   const [query, setQuery] = useState({ country: "", timezone: "", coach: "", level: "", date: "", status: "" });
+  const [draftQuery, setDraftQuery] = useState(query);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,6 +87,19 @@ export default function AcademyEventManager({ type, title, description }: { type
     (!query.date || event.date.slice(0, 10) === query.date) &&
     (!query.status || event.status === query.status)
   )), [events, query]);
+  const activeFilterCount = Object.values(query).filter(Boolean).length;
+  const updateDraftQuery = (key: keyof typeof draftQuery, value: string) => {
+    setDraftQuery((current) => ({ ...current, [key]: value }));
+  };
+  const applyFilters = () => {
+    setQuery(draftQuery);
+    setFiltersOpen(false);
+  };
+  const clearFilters = () => {
+    const cleared = { country: "", timezone: "", coach: "", level: "", date: "", status: "" };
+    setDraftQuery(cleared);
+    setQuery(cleared);
+  };
 
   const openCreate = () => { setEditing(null); setForm(emptyForm(type)); setError(""); setFormOpen(true); };
   const openEdit = (event: AcademyEvent) => {
@@ -132,13 +147,27 @@ export default function AcademyEventManager({ type, title, description }: { type
       {error && <div className="admin-alert admin-alert-error">{error}</div>}
       {message && <div className="admin-alert admin-alert-success">{message}</div>}
 
-      <div className="admin-toolbar flex-wrap">
-        <select className="admin-control admin-control-select" value={query.country} onChange={(e) => setQuery({ ...query, country: e.target.value })}><option value="">All countries</option>{COUNTRIES.map((country) => <option key={country}>{country}</option>)}</select>
-        <select className="admin-control admin-control-select" value={query.timezone} onChange={(e) => setQuery({ ...query, timezone: e.target.value })}><option value="">All time zones</option>{TIMEZONES.map((timezone) => <option key={timezone}>{timezone}</option>)}</select>
-        {type === "masterclass" && <><select className="admin-control admin-control-select" value={query.coach} onChange={(e) => setQuery({ ...query, coach: e.target.value })}><option value="">All coaches</option>{coaches.map((coach) => <option key={coach._id} value={coach._id}>{coach.name}</option>)}</select><select className="admin-control admin-control-select" value={query.level} onChange={(e) => setQuery({ ...query, level: e.target.value })}><option value="">All levels</option>{LEVELS.map((level) => <option key={level}>{level}</option>)}</select></>}
-        <input type="date" className="admin-control" value={query.date} onChange={(e) => setQuery({ ...query, date: e.target.value })} />
-        <select className="admin-control admin-control-select" value={query.status} onChange={(e) => setQuery({ ...query, status: e.target.value })}><option value="">All statuses</option><option value="scheduled">Scheduled</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select>
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <button type="button" className={secondaryButtonClass} onClick={() => { setDraftQuery(query); setFiltersOpen((open) => !open); }} aria-expanded={filtersOpen}>
+          <SlidersHorizontal className="h-4 w-4" /> Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+        </button>
+        {activeFilterCount > 0 && <button type="button" className="text-sm font-semibold text-[var(--color-muted)] hover:text-[var(--color-walnut)]" onClick={clearFilters}>Clear all</button>}
+        <span className="text-sm text-[var(--color-muted)]">Showing {filteredEvents.length} of {events.length} {type === "masterclass" ? "masterclasses" : "tournaments"}</span>
       </div>
+      {filtersOpen && <div className="mb-6 rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] p-4 shadow-sm">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <select className="admin-control admin-control-select" value={draftQuery.country} onChange={(e) => updateDraftQuery("country", e.target.value)}><option value="">All countries</option>{COUNTRIES.map((country) => <option key={country}>{country}</option>)}</select>
+          <select className="admin-control admin-control-select" value={draftQuery.timezone} onChange={(e) => updateDraftQuery("timezone", e.target.value)}><option value="">All time zones</option>{TIMEZONES.map((timezone) => <option key={timezone}>{timezone}</option>)}</select>
+          {type === "masterclass" && <select className="admin-control admin-control-select" value={draftQuery.coach} onChange={(e) => updateDraftQuery("coach", e.target.value)}><option value="">All coaches</option>{coaches.map((coach) => <option key={coach._id} value={coach._id}>{coach.name}</option>)}</select>}
+          {type === "masterclass" && <select className="admin-control admin-control-select" value={draftQuery.level} onChange={(e) => updateDraftQuery("level", e.target.value)}><option value="">All levels</option>{LEVELS.map((level) => <option key={level}>{level}</option>)}</select>}
+          <input type="date" aria-label="Filter by date" className="admin-control" value={draftQuery.date} onChange={(e) => updateDraftQuery("date", e.target.value)} />
+          <select className="admin-control admin-control-select" value={draftQuery.status} onChange={(e) => updateDraftQuery("status", e.target.value)}><option value="">All statuses</option><option value="scheduled">Scheduled</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select>
+        </div>
+        <div className="mt-4 flex justify-end gap-3">
+          <button type="button" className={secondaryButtonClass} onClick={clearFilters}>Clear</button>
+          <button type="button" className={primaryButtonClass} onClick={applyFilters}>Apply filters</button>
+        </div>
+      </div>}
 
       <div className="admin-table-shell">
         {loading ? <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" /></div> : filteredEvents.length === 0 ? <div className="admin-empty">No {type} history found.</div> : (

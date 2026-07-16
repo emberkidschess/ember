@@ -132,7 +132,7 @@ export interface CoachReports {
   coverUpReport: Record<string, unknown>[];
 }
 
-export const getCoachReports = (params?: { coach?: string; dateFrom?: string; dateTo?: string; country?: string; timezone?: string }) =>
+export const getCoachReports = (params?: { coach?: string; day?: string; dateFrom?: string; dateTo?: string; country?: string; timezone?: string }) =>
   adminFetchJSON<ApiItemResponse<CoachReports>>(`/reports/coaches${toQueryString(params)}`);
 
 // ---------- Leads ----------
