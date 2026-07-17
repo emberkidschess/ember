@@ -9,10 +9,23 @@ import StatusBadge from "@/components/admin/StatusBadge";
 import Modal from "@/components/admin/Modal";
 import { FormField, inputClass, selectClass, primaryButtonClass, secondaryButtonClass, dangerButtonClass } from "@/components/admin/FormField";
 import { getStaffList, createStaffMember, updateStaffMember, deleteStaffMember, toggleStaffStatus, resetStaffPassword, type StaffMember } from "@/lib/adminApi";
-import { ALL_PERMISSION_KEYS } from "@/lib/permissions";
+import { ALL_PERMISSION_KEYS, PERMISSION_GROUPS } from "@/lib/permissions";
 
 const ROLES = ["coach", "staff"] as const;
-const PERMISSIONS = ALL_PERMISSION_KEYS;
+const ROLE_PRESETS: Record<StaffFormState["role"], string[]> = {
+  coach: [
+    "view_students", "schedule_classes", "create_edit_class",
+    "assign_students_to_class", "reschedule_class", "cancel_class",
+    "post_class_notes", "resolve_attendance_dispute", "override_attendance",
+    "create_report_card", "export_report_card", "view_coach_reports",
+  ],
+  staff: [
+    "view_leads", "edit_leads", "convert_lead_to_student", "schedule_trial",
+    "mark_trial_result", "view_students", "edit_students", "enroll_student",
+    "generate_payment_link", "send_payment_link", "mark_payment_received",
+    "view_payment_history",
+  ],
+};
 
 type StaffFormState = {
   name: string;
@@ -93,14 +106,21 @@ export default function StaffPage() {
   };
 
   const handleSave = async () => {
-    if (!/^https?:\/\//i.test(form.defaultClassLink.trim())) {
+    if (form.role === "coach" && !/^https?:\/\//i.test(form.defaultClassLink.trim())) {
       setError("Enter a valid HTTP or HTTPS Default Class Link before saving.");
       return;
     }
     setSaving(true);
+    setError("");
     try {
+      const payload = {
+        ...form,
+        expertise: form.role === "coach" ? form.expertise : [],
+        salaryPerClass: form.role === "coach" ? form.salaryPerClass : 0,
+        defaultClassLink: form.role === "coach" ? form.defaultClassLink.trim() : undefined,
+      };
       if (editingStaff) {
-        const data = await updateStaffMember(editingStaff._id, form);
+        const data = await updateStaffMember(editingStaff._id, payload);
         if (data.success) {
           setModalOpen(false);
           load();
@@ -108,7 +128,7 @@ export default function StaffPage() {
           setError(data.error || "Failed to update staff member");
         }
       } else {
-        const data = await createStaffMember(form);
+        const data = await createStaffMember(payload);
         if (data.success) {
           setModalOpen(false);
           if (data.data.tempPassword) {
@@ -197,6 +217,19 @@ export default function StaffPage() {
     });
   };
 
+  const applyPermissionSet = (permissions: string[]) => {
+    setForm((current) => ({ ...current, permissions: [...new Set(permissions)] }));
+  };
+
+  const togglePermissionGroup = (keys: string[]) => {
+    setForm((current) => {
+      const selected = new Set(current.permissions);
+      const groupIsSelected = keys.every((key) => selected.has(key));
+      keys.forEach((key) => groupIsSelected ? selected.delete(key) : selected.add(key));
+      return { ...current, permissions: [...selected] };
+    });
+  };
+
   const filteredStaff = useMemo(() => {
     let result = staff;
     if (roleFilter) {
@@ -254,7 +287,14 @@ export default function StaffPage() {
             </option>
           ))}
         </select>
+        {(search || roleFilter) && (
+          <button type="button" onClick={() => { setSearch(""); setRoleFilter(""); }} className={secondaryButtonClass}>
+            Clear filters
+          </button>
+        )}
       </div>
+
+      {!loading && <p className="mb-4 text-sm text-[var(--color-muted)]">Showing {filteredStaff.length} of {staff.length} team members</p>}
 
       {loading ? (
         <div className="flex justify-center py-12">
@@ -339,63 +379,89 @@ export default function StaffPage() {
             >
               {ROLES.map((role) => (
                 <option key={role} value={role}>
-                  {role.toUpperCase()}
+                  {role === "coach" ? "Teaching Coach" : "Operations Staff"}
                 </option>
               ))}
             </select>
           </FormField>
-          <FormField label="Salary Per Class">
-            <input
-              type="number"
-              value={form.salaryPerClass}
-              onChange={(e) => setForm({ ...form, salaryPerClass: parseFloat(e.target.value) || 0 })}
-              className={inputClass}
-              min="0"
-              step="0.01"
-            />
-          </FormField>
-          <FormField label="Default Class Link" required>
-            <input
-              type="url"
-              required
-              placeholder="https://meet.google.com/..."
-              value={form.defaultClassLink}
-              onChange={(e) => setForm({ ...form, defaultClassLink: e.target.value })}
-              className={inputClass}
-            />
-            <p className="mt-1 text-xs text-[var(--color-muted)]">This link is automatically used for every batch assigned to this staff member.</p>
-          </FormField>
-          <FormField label="Expertise">
-            <div className="flex flex-wrap gap-2">
-              {["Beginner", "Intermediate", "Advanced", "Expert"].map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => handleExpertiseToggle(level)}
-                  className={`rounded-full border px-3 py-1.5 text-sm font-bold transition ${
-                    form.expertise.includes(level)
-                      ? "border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]"
-                      : "border-[var(--color-line)] bg-[var(--color-paper)] text-[var(--color-muted)] hover:bg-[var(--color-ivory)]"
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
+          {form.role === "coach" && <>
+            <FormField label="Salary Per Class">
+              <input
+                type="number"
+                value={form.salaryPerClass}
+                onChange={(e) => setForm({ ...form, salaryPerClass: parseFloat(e.target.value) || 0 })}
+                className={inputClass}
+                min="0"
+                step="0.01"
+              />
+            </FormField>
+            <FormField label="Default Class Link" required>
+              <input
+                type="url"
+                required
+                placeholder="https://meet.google.com/..."
+                value={form.defaultClassLink}
+                onChange={(e) => setForm({ ...form, defaultClassLink: e.target.value })}
+                className={inputClass}
+              />
+              <p className="mt-1 text-xs text-[var(--color-muted)]">Used automatically for every batch this coach teaches.</p>
+            </FormField>
+            <FormField label="Teaching Expertise">
+              <div className="flex flex-wrap gap-2">
+                {["Beginner", "Intermediate", "Advanced", "Expert"].map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => handleExpertiseToggle(level)}
+                    className={`rounded-full border px-3 py-1.5 text-sm font-bold transition ${
+                      form.expertise.includes(level)
+                        ? "border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]"
+                        : "border-[var(--color-line)] bg-[var(--color-paper)] text-[var(--color-muted)] hover:bg-[var(--color-ivory)]"
+                    }`}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </FormField>
+          </>}
+          <FormField label="Access">
+            <div className="mb-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-ivory)] p-3">
+              <p className="text-sm font-semibold text-[var(--color-walnut)]">{form.permissions.length} of {ALL_PERMISSION_KEYS.length} permissions selected</p>
+              <p className="mt-1 text-xs text-[var(--color-muted)]">Start with a role preset, then make only the exceptions you need.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => applyPermissionSet(ROLE_PRESETS[form.role])} className={secondaryButtonClass}>Apply {form.role === "coach" ? "coach" : "staff"} preset</button>
+                <button type="button" onClick={() => applyPermissionSet(ALL_PERMISSION_KEYS)} className={secondaryButtonClass}>Select all</button>
+                <button type="button" onClick={() => applyPermissionSet([])} className="px-3 text-sm font-semibold text-[var(--color-muted)] hover:text-[var(--color-walnut)]">Clear all</button>
+              </div>
             </div>
-          </FormField>
-          <FormField label="Permissions">
-            <div className="grid grid-cols-2 gap-2">
-              {PERMISSIONS.map((permission) => (
-                <label key={permission} className="flex items-center gap-2 rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm text-[var(--color-muted)]">
-                  <input
-                    type="checkbox"
-                    checked={form.permissions.includes(permission)}
-                    onChange={() => handlePermissionToggle(permission)}
-                    className="rounded border-[var(--color-line)] accent-[var(--color-ember)]"
-                  />
-                  {permission.replace(/_/g, " ")}
-                </label>
-              ))}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {PERMISSION_GROUPS.map((group) => {
+                const keys = group.permissions.map((permission) => permission.key);
+                const selectedCount = keys.filter((key) => form.permissions.includes(key)).length;
+                const allSelected = selectedCount === keys.length;
+                return (
+                  <section key={group.group} className="rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-[var(--color-walnut)]">{group.group} <span className="font-medium text-[var(--color-muted)]">{selectedCount}/{keys.length}</span></p>
+                      <button type="button" onClick={() => togglePermissionGroup(keys)} className="text-xs font-bold text-[var(--color-pine-deep)] hover:underline">{allSelected ? "Clear group" : "Select group"}</button>
+                    </div>
+                    <div className="space-y-1.5">
+                      {group.permissions.map((permission) => (
+                        <label key={permission.key} className="flex cursor-pointer items-start gap-2 rounded-lg px-1 py-1 text-sm text-[var(--color-muted)] hover:bg-[var(--color-ivory)]">
+                          <input
+                            type="checkbox"
+                            checked={form.permissions.includes(permission.key)}
+                            onChange={() => handlePermissionToggle(permission.key)}
+                            className="mt-0.5 rounded border-[var(--color-line)] accent-[var(--color-ember)]"
+                          />
+                          <span>{permission.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
             </div>
           </FormField>
         </div>

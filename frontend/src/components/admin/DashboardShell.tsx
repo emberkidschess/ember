@@ -227,7 +227,7 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
       >
         <div className="flex items-center justify-between px-6 h-16 border-b border-white/10 shrink-0">
           <Link href={`/${portal}/dashboard`} className="font-[family-name:var(--font-playfair)] font-bold text-lg">
-            EmberKids <span className="text-[var(--color-gold)]">{portal === "admin" ? "Admin" : "Staff"}</span>
+            EmberKids <span className="text-[var(--color-gold)]">{portal === "admin" ? "Admin" : (user.role === "coach" ? "Coach" : "Staff")}</span>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}

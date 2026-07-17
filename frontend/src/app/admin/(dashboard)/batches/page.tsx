@@ -115,6 +115,19 @@ function durationInMinutes(value: string, unit: "minutes" | "hours") {
   return Math.round(unit === "hours" ? numeric * 60 : numeric);
 }
 
+function canJoinBatchAtLevel(student: Student, courseLevel: string) {
+  const currentPackage = student.currentPackageId;
+  if (typeof currentPackage === "string" || !currentPackage) return false;
+  const matchingLevel = currentPackage.courseLevel === courseLevel ||
+    (courseLevel === "Expert" && currentPackage.courseLevel === "Master");
+  return student.studentStatus === "active" &&
+    student.enrollmentStatus === "enrolled" &&
+    student.portalStatus === "active" &&
+    currentPackage.status === "active" &&
+    currentPackage.remainingClasses > 0 &&
+    matchingLevel;
+}
+
 function DurationPicker({ value, unit, onChange }: {
   value: string;
   unit: "minutes" | "hours";
@@ -209,6 +222,11 @@ export default function BatchesPage() {
     });
   }, [batches, search, statusFilter]);
 
+  const eligibleInitialStudents = useMemo(
+    () => allStudents.filter((student) => canJoinBatchAtLevel(student, form.courseLevel)),
+    [allStudents, form.courseLevel]
+  );
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
@@ -262,12 +280,15 @@ export default function BatchesPage() {
     e.preventDefault();
     if (!renameTarget) return;
     setRenameSaving(true);
+    setError("");
     try {
       const res = await renameBatch(renameTarget._id, renameForm.name, renameForm.courseLevel || undefined);
       if (res.success) {
         setRenameTarget(null);
         await reloadBatches();
-      }
+      } else setError(res.error || "Could not rename the batch.");
+    } catch {
+      setError("Could not connect to the server.");
     } finally {
       setRenameSaving(false);
     }
@@ -277,6 +298,7 @@ export default function BatchesPage() {
     e.preventDefault();
     if (!editTarget) return;
     setEditSaving(true);
+    setError("");
     try {
       const res = await updateBatch(editTarget._id, {
         coach: editForm.coach || undefined,
@@ -286,7 +308,9 @@ export default function BatchesPage() {
       if (res.success) {
         setEditTarget(null);
         await reloadBatches();
-      }
+      } else setError(res.error || "Could not update the batch.");
+    } catch {
+      setError("Could not connect to the server.");
     } finally {
       setEditSaving(false);
     }
@@ -324,12 +348,15 @@ export default function BatchesPage() {
   const handleStatusUpdate = async () => {
     if (!statusTarget || !newStatus) return;
     setStatusSaving(true);
+    setError("");
     try {
       const res = await updateBatchStatus(statusTarget._id, newStatus);
       if (res.success) {
         setStatusTarget(null);
         await reloadBatches();
-      }
+      } else setError(res.error || "Could not update batch status.");
+    } catch {
+      setError("Could not connect to the server.");
     } finally {
       setStatusSaving(false);
     }
@@ -338,6 +365,7 @@ export default function BatchesPage() {
   const handleAddStudents = async () => {
     if (!studentsTarget || addStudentIds.length === 0) return;
     setStudentSaving(true);
+    setError("");
     try {
       const res = await addStudentsToBatch(studentsTarget._id, addStudentIds);
       if (res.success) {
@@ -345,7 +373,9 @@ export default function BatchesPage() {
         const merged = { ...studentsTarget, students: res.data.students, studentCount: res.data.students.length };
         setStudentsTarget(merged);
         setBatches((current) => current.map((batch) => batch._id === merged._id ? merged : batch));
-      }
+      } else setError(res.error || "Could not add the selected students.");
+    } catch {
+      setError("Could not connect to the server.");
     } finally {
       setStudentSaving(false);
     }
@@ -353,25 +383,29 @@ export default function BatchesPage() {
 
   const handleRemoveStudent = async (studentId: string) => {
     if (!studentsTarget) return;
+    setError("");
     try {
       const res = await removeStudentFromBatch(studentsTarget._id, studentId);
       if (res.success) {
         const merged = { ...studentsTarget, students: res.data.students, studentCount: res.data.students.length };
         setStudentsTarget(merged);
         setBatches((current) => current.map((batch) => batch._id === merged._id ? merged : batch));
-      }
+      } else setError(res.error || "Could not remove this student.");
     } catch {
-      /* ignore */
+      setError("Could not connect to the server.");
     }
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    setError("");
     try {
       const res = await deleteBatch(deleteTarget._id);
       if (res.success) {
         setBatches((prev) => prev.filter((b) => b._id !== deleteTarget._id));
-      }
+      } else setError(res.error || "Could not delete the batch.");
+    } catch {
+      setError("Could not connect to the server.");
     } finally {
       setDeleteTarget(null);
     }
@@ -380,7 +414,7 @@ export default function BatchesPage() {
   const studentsNotInBatch = useMemo(() => {
     if (!studentsTarget) return [];
     const existing = new Set(studentsTarget.students.map((s) => (typeof s === "object" ? s._id : String(s))));
-    return allStudents.filter((s) => !existing.has(s._id));
+    return allStudents.filter((s) => !existing.has(s._id) && canJoinBatchAtLevel(s, studentsTarget.courseLevel));
   }, [studentsTarget, allStudents]);
 
   return (
@@ -574,7 +608,7 @@ export default function BatchesPage() {
               <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} placeholder="e.g. Batch A" />
             </FormField>
             <FormField label="Course Level" required>
-              <select required value={form.courseLevel} onChange={(e) => setForm({ ...form, courseLevel: e.target.value })} className={selectClass}>
+              <select required value={form.courseLevel} onChange={(e) => setForm({ ...form, courseLevel: e.target.value, students: [] })} className={selectClass}>
                 {COURSE_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </FormField>
@@ -643,9 +677,9 @@ export default function BatchesPage() {
               onChange={(e) => setForm({ ...form, students: Array.from(e.target.selectedOptions as HTMLCollectionOf<HTMLOptionElement>).map((o) => o.value) })}
               className={selectClass + " h-32"}
             >
-              {allStudents.map((s) => <option key={s._id} value={s._id}>{s.studentName}</option>)}
+              {eligibleInitialStudents.map((s) => <option key={s._id} value={s._id}>{s.studentName}</option>)}
             </select>
-            <p className="text-xs text-[var(--color-muted)] mt-1">Hold Ctrl/Cmd to select multiple.</p>
+            <p className="text-xs text-[var(--color-muted)] mt-1">Only active students with a matching package are shown. Hold Ctrl/Cmd to select multiple.</p>
           </FormField>
 
           <FormField label="Notes">
@@ -784,7 +818,7 @@ export default function BatchesPage() {
               >
                 {studentsNotInBatch.map((s) => <option key={s._id} value={s._id}>{s.studentName}</option>)}
               </select>
-              <p className="text-xs text-[var(--color-muted)] mt-1">Hold Ctrl/Cmd to select multiple.</p>
+              <p className="text-xs text-[var(--color-muted)] mt-1">Only eligible students at this batch level are shown. Hold Ctrl/Cmd to select multiple.</p>
               <div className="flex justify-end mt-3">
                 <button onClick={handleAddStudents} disabled={studentSaving || addStudentIds.length === 0} className={primaryButtonClass}>
                   {studentSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
@@ -822,13 +856,32 @@ export default function BatchesPage() {
 
       {/* Delete Modal */}
       <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Batch" maxWidth="max-w-sm">
-        <p className="text-sm text-[var(--color-walnut)] mb-5">
-          Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This cannot be undone.
-        </p>
-        <div className="flex justify-end gap-3">
-          <button onClick={() => setDeleteTarget(null)} className={secondaryButtonClass}>Cancel</button>
-          <button onClick={handleDelete} className={dangerButtonClass}>Delete</button>
-        </div>
+        {deleteTarget?.students && deleteTarget.students.length > 0 ? (
+          <div className="space-y-4">
+            <div className="bg-[var(--color-ember)]/10 border border-[var(--color-ember)]/30 rounded-xl p-4">
+              <p className="text-sm font-medium text-[var(--color-ember-deep)] mb-2">
+                Cannot delete batch with students
+              </p>
+              <p className="text-xs text-[var(--color-ember-deep)]">
+                This batch has <strong>{deleteTarget.students.length} student(s)</strong> enrolled.
+                Batches with students cannot be deleted. Please mark the batch as completed instead.
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <button onClick={() => setDeleteTarget(null)} className={secondaryButtonClass}>Close</button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-[var(--color-walnut)]">
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setDeleteTarget(null)} className={secondaryButtonClass}>Cancel</button>
+              <button onClick={handleDelete} className={dangerButtonClass}>Delete</button>
+            </div>
+          </div>
+        )}
       </Modal>
 
     </div>

@@ -1,10 +1,11 @@
 import { Response } from 'express';
 import mongoose from 'mongoose';
 import Batch, { BatchStatus } from '../models/Batch';
-import Staff, { StaffStatus } from '../models/Staff';
+import Staff, { StaffRole, StaffStatus } from '../models/Staff';
+import Student, { EnrollmentStatus, PortalStatus, StudentStatus } from '../models/Student';
+import Package, { PackageStatus } from '../models/Package';
 import { AuthRequest } from '../middleware/auth';
 import AuditLog, { AuditAction, AuditEntityType } from '../models/AuditLog';
-import { validateStudent, validateStaff, validateBatch } from '../utils/foreignKeys';
 import { buildAuditLogData } from '../middleware/auditLogger';
 import { sanitizeQueryParam, sanitizePaginationParams } from '../utils/validation';
 import { CacheService, generateCacheKey, CacheNamespaces } from '../utils/cache';
@@ -20,6 +21,97 @@ import {
   generateRecurringClasses,
   removeStudentFromScheduledBatchClasses,
 } from '../services/batchSchedulingService';
+
+async function findActiveCoach(
+  coachId: string,
+  session?: mongoose.ClientSession
+) {
+  if (!mongoose.Types.ObjectId.isValid(coachId)) {
+    throw new BatchSchedulingError('Invalid coach ID');
+  }
+  const query = Staff.findOne({
+    _id: coachId,
+    role: StaffRole.COACH,
+    status: StaffStatus.ACTIVE,
+  }).select('defaultClassLink');
+  if (session) query.session(session);
+  const coach = await query.lean();
+  if (!coach) {
+    throw new BatchSchedulingError('Selected coach must be an active coach');
+  }
+  if (!coach.defaultClassLink) {
+    throw new BatchSchedulingError(
+      'Selected coach must have a default class link before creating or assigning a batch'
+    );
+  }
+  return coach;
+}
+
+/**
+ * A batch can be created empty, but every student added to it must have an
+ * active, matching package.  Without this check a student could be put into
+ * a wrong-level batch and only discover the failure when trying to join.
+ */
+async function assertStudentsEligibleForBatch(
+  studentIds: string[],
+  courseLevel: string,
+  session?: mongoose.ClientSession
+): Promise<void> {
+  if (studentIds.length === 0) return;
+  if (studentIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+    throw new BatchSchedulingError('One or more selected student IDs are invalid');
+  }
+
+  const studentsQuery = Student.find({ _id: { $in: studentIds } })
+    .select('_id studentName currentPackageId currentBatchId studentStatus enrollmentStatus portalStatus');
+  if (session) studentsQuery.session(session);
+  const students = await studentsQuery.lean();
+  if (students.length !== studentIds.length) {
+    throw new BatchSchedulingError('One or more selected students no longer exist');
+  }
+
+  const packageIds = students
+    .map((student) => student.currentPackageId?.toString())
+    .filter((id): id is string => Boolean(id));
+  const packageQuery = Package.find({
+    _id: { $in: packageIds },
+    status: PackageStatus.ACTIVE,
+    remainingClasses: { $gt: 0 },
+    courseLevel: courseLevel === 'Expert' ? { $in: ['Expert', 'Master'] } : courseLevel,
+  }).select('_id');
+  if (session) packageQuery.session(session);
+  const matchingPackageIds = new Set(
+    (await packageQuery.lean()).map((packageItem) => packageItem._id.toString())
+  );
+  const currentBatchIds = students
+    .map((student) => student.currentBatchId?.toString())
+    .filter((id): id is string => Boolean(id));
+  const activeBatchIds = new Set(
+    (await Batch.find({ _id: { $in: currentBatchIds }, status: { $in: [BatchStatus.UPCOMING, BatchStatus.ONGOING] } })
+      .select('_id')
+      .lean())
+      .map((batch) => batch._id.toString())
+  );
+
+  const ineligible = students.find((student) =>
+    student.studentStatus !== StudentStatus.ACTIVE ||
+    student.enrollmentStatus !== EnrollmentStatus.ENROLLED ||
+    student.portalStatus !== PortalStatus.ACTIVE ||
+    !student.currentPackageId ||
+    !matchingPackageIds.has(student.currentPackageId.toString()) ||
+    Boolean(student.currentBatchId && activeBatchIds.has(student.currentBatchId.toString()))
+  );
+  if (ineligible) {
+    const isInAnotherActiveBatch = Boolean(
+      ineligible.currentBatchId && activeBatchIds.has(ineligible.currentBatchId.toString())
+    );
+    throw new BatchSchedulingError(
+      isInAnotherActiveBatch
+        ? `${ineligible.studentName} is already assigned to an active batch`
+        : `${ineligible.studentName} needs an active ${courseLevel} package and an active portal before joining this batch`
+    );
+  }
+}
 
 export const getBatches = async (req: AuthRequest, res: Response) => {
   try {
@@ -199,24 +291,10 @@ export const createBatch = async (req: AuthRequest, res: Response) => {
       notes, whatsappCommunityLink,
     } = req.body;
 
-    await validateStaff(coach);
-    const assignedCoach = await Staff.findOne({ _id: coach, status: StaffStatus.ACTIVE })
-      .select('defaultClassLink')
-      .lean();
-    if (!assignedCoach) {
-      return res.status(400).json({ success: false, error: 'Selected staff member is not active' });
-    }
-    if (!assignedCoach.defaultClassLink) {
-      return res.status(400).json({
-        success: false,
-        error: 'Selected staff member must have a default class link before creating a batch',
-      });
-    }
+    const assignedCoach = await findActiveCoach(coach, session);
 
-    const studentIds: string[] = Array.isArray(students) ? students : [];
-    if (studentIds.length > 0) {
-      await Promise.all(studentIds.map((id) => validateStudent(id)));
-    }
+    const studentIds: string[] = Array.isArray(students) ? [...new Set(students)] : [];
+    await assertStudentsEligibleForBatch(studentIds, courseLevel, session);
 
     const existing = await Batch.findOne({ courseLevel, name });
     if (existing) {
@@ -244,7 +322,14 @@ export const createBatch = async (req: AuthRequest, res: Response) => {
         const Student = (await import('../models/Student')).default;
         await Student.updateMany(
           { _id: { $in: studentIds } },
-          { currentBatchId: batch._id, whatsappCommunityLink },
+          {
+            $set: {
+              currentBatchId: batch._id,
+              assignedStaff: coach,
+              course: courseLevel,
+              whatsappCommunityLink,
+            },
+          },
           { session }
         );
       }
@@ -276,7 +361,10 @@ export const createBatch = async (req: AuthRequest, res: Response) => {
     }
 
     // Invalidate batch list cache
-    await CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`);
+    await Promise.all([
+      CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`),
+      CacheService.deletePattern(`${CacheNamespaces.STUDENT_LIST}:*`),
+    ]);
 
     res.status(201).json({
       success: true,
@@ -296,6 +384,9 @@ export const createBatch = async (req: AuthRequest, res: Response) => {
         success: false,
         error: error.message,
       });
+    }
+    if (error.name === 'CastError') {
+      return res.status(400).json({ success: false, error: 'Invalid coach or student ID' });
     }
     if (error.message?.includes('Staff not found')) {
       return res.status(400).json({
@@ -329,16 +420,7 @@ export const updateBatch = async (req: AuthRequest, res: Response) => {
 
     let nextCoachDefaultLink: string | undefined;
     if (coach) {
-      await validateStaff(coach);
-      const nextCoach = await Staff.findOne({ _id: coach, status: StaffStatus.ACTIVE })
-        .select('defaultClassLink')
-        .lean();
-      if (!nextCoach?.defaultClassLink) {
-        return res.status(400).json({
-          success: false,
-          error: 'Selected staff member must have a default class link before assigning them to a batch',
-        });
-      }
+      const nextCoach = await findActiveCoach(coach);
       nextCoachDefaultLink = nextCoach.defaultClassLink;
     }
 
@@ -387,6 +469,11 @@ export const updateBatch = async (req: AuthRequest, res: Response) => {
       const classIds = futureClasses.map((item) => item._id);
       await Class.updateMany({ _id: { $in: classIds } }, { $set: { coach } });
       await Attendance.updateMany({ class: { $in: classIds } }, { $set: { coach } });
+      const Student = (await import('../models/Student')).default;
+      await Student.updateMany(
+        { _id: { $in: batch.students }, currentBatchId: batch._id },
+        { $set: { assignedStaff: coach } }
+      );
     }
     if (whatsappCommunityLink !== undefined) {
       const Student = (await import('../models/Student')).default;
@@ -402,7 +489,10 @@ export const updateBatch = async (req: AuthRequest, res: Response) => {
     }));
 
     // Invalidate batch list cache and specific batch cache
-    await CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`);
+    await Promise.all([
+      CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`),
+      CacheService.deletePattern(`${CacheNamespaces.STUDENT_LIST}:*`),
+    ]);
     await CacheService.delete(generateCacheKey(CacheNamespaces.BATCH_DETAILS, req.params.id));
 
     res.json({
@@ -492,7 +582,10 @@ export const renameBatch = async (req: AuthRequest, res: Response) => {
     }));
 
     // Invalidate batch list cache and specific batch cache
-    await CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`);
+    await Promise.all([
+      CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`),
+      CacheService.deletePattern(`${CacheNamespaces.STUDENT_LIST}:*`),
+    ]);
     await CacheService.delete(generateCacheKey(CacheNamespaces.BATCH_DETAILS, req.params.id));
 
     res.json({
@@ -532,10 +625,10 @@ export const addStudentsToBatch = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    await Promise.all(studentIds.map((id) => validateStudent(id)));
-
     const existingIds = new Set(batch.students.map((id) => id.toString()));
-    const newIds = studentIds.filter((id) => !existingIds.has(id));
+    const newIds = [...new Set(studentIds)].filter((id) => !existingIds.has(id));
+
+    await assertStudentsEligibleForBatch(newIds, batch.courseLevel);
 
     await assertStudentsAvailableForScheduledBatch(batch._id, newIds);
 
@@ -547,8 +640,12 @@ export const addStudentsToBatch = async (req: AuthRequest, res: Response) => {
       await Student.updateMany(
         { _id: { $in: newIds } },
         {
-          currentBatchId: batch._id,
-          ...(batch.whatsappCommunityLink ? { whatsappCommunityLink: batch.whatsappCommunityLink } : {}),
+          $set: {
+            currentBatchId: batch._id,
+            assignedStaff: batch.coach,
+            course: batch.courseLevel,
+            ...(batch.whatsappCommunityLink ? { whatsappCommunityLink: batch.whatsappCommunityLink } : {}),
+          },
         }
       );
       await addStudentsToScheduledBatchClasses(batch._id, newIds);
@@ -563,7 +660,10 @@ export const addStudentsToBatch = async (req: AuthRequest, res: Response) => {
     }));
 
     // Invalidate batch list cache and specific batch cache
-    await CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`);
+    await Promise.all([
+      CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`),
+      CacheService.deletePattern(`${CacheNamespaces.STUDENT_LIST}:*`),
+    ]);
     await CacheService.delete(generateCacheKey(CacheNamespaces.BATCH_DETAILS, req.params.id));
 
     const populated = await Batch.findById(batch._id).populate('students', 'studentName parentName email studentStatus');
@@ -622,6 +722,10 @@ export const removeStudentFromBatch = async (req: AuthRequest, res: Response) =>
 
     const Student = (await import('../models/Student')).default;
     await Student.updateOne({ _id: studentId, currentBatchId: batch._id }, { $unset: { currentBatchId: '' } });
+    await Student.updateOne(
+      { _id: studentId, assignedStaff: batch.coach },
+      { $unset: { assignedStaff: '' } }
+    );
     await removeStudentFromScheduledBatchClasses(batch._id, studentId);
 
     await AuditLog.create(buildAuditLogData(req, {

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Search, Calendar, Users, Clock3, ExternalLink, MessageCircle } from "lucide-react";
+import { Loader2, Search, Calendar, Users, Clock3, ExternalLink, MessageCircle, RefreshCw } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import StatusBadge from "@/components/admin/StatusBadge";
+import { secondaryButtonClass } from "@/components/admin/FormField";
 import { getBatches, type Batch } from "@/lib/adminApi";
 import { formatCourseLevel } from "@/lib/labels";
 
@@ -15,6 +16,7 @@ export default function StaffBatchesPage() {
 
   const load = async () => {
     setLoading(true);
+    setError("");
     try {
       const data = await getBatches();
       if (data.success) {
@@ -41,8 +43,11 @@ export default function StaffBatchesPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" />
+      <div>
+        <PageHeader title="Batches" description="View and manage teaching batches" />
+        <div className="flex justify-center py-12" role="status" aria-label="Loading batches">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" />
+        </div>
       </div>
     );
   }
@@ -70,6 +75,12 @@ export default function StaffBatchesPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="admin-control admin-control-search"
           />
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-[var(--color-muted)]">{filteredBatches.length} shown</span>
+          <button type="button" onClick={() => void load()} disabled={loading} className={secondaryButtonClass}>
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </button>
         </div>
       </div>
 
@@ -124,7 +135,7 @@ export default function StaffBatchesPage() {
           </tbody>
         </table>
         {filteredBatches.length === 0 && (
-          <div className="admin-empty">No batches found</div>
+          <div className="admin-empty">{search.trim() ? `No batches match “${search.trim()}”.` : "No batches found"}</div>
         )}
       </div>
     </div>

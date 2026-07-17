@@ -338,19 +338,25 @@ export async function createExtraBatchClass(
   return classItem;
 }
 
-function futureScheduledClasses(batchId: string | mongoose.Types.ObjectId) {
-  return Class.find({ batch: batchId, status: ClassStatus.SCHEDULED }).select(
+function futureScheduledClasses(
+  batchId: string | mongoose.Types.ObjectId,
+  options: SessionOption = {}
+) {
+  const query = Class.find({ batch: batchId, status: ClassStatus.SCHEDULED }).select(
     '_id coach date startTime endTime timezone'
   );
+  if (options.session) query.session(options.session);
+  return query;
 }
 
 export async function addStudentsToScheduledBatchClasses(
   batchId: string | mongoose.Types.ObjectId,
-  studentIds: string[]
+  studentIds: string[],
+  options: SessionOption = {}
 ): Promise<void> {
   if (studentIds.length === 0) return;
   const now = new Date();
-  const candidates = await futureScheduledClasses(batchId).lean();
+  const candidates = await futureScheduledClasses(batchId, options).lean();
   const classes = candidates.filter(
     (item: any) => classWindow(item).endAt > now
   );
@@ -358,7 +364,8 @@ export async function addStudentsToScheduledBatchClasses(
 
   await Class.updateMany(
     { _id: { $in: classes.map((item) => item._id) } },
-    { $addToSet: { students: { $each: studentIds } } }
+    { $addToSet: { students: { $each: studentIds } } },
+    options.session ? { session: options.session } : undefined
   );
   await Attendance.bulkWrite(
     classes.flatMap((classItem: any) =>
@@ -375,7 +382,8 @@ export async function addStudentsToScheduledBatchClasses(
           upsert: true,
         },
       }))
-    )
+    ),
+    options.session ? { session: options.session } : undefined
   );
 }
 
@@ -450,7 +458,7 @@ export function classAccessDto(classItem: any, includeMeetingLink = false) {
   return {
     _id: classItem._id.toString(),
     course: classItem.course,
-    classType: classItem.classType,
+    classType: classItem.classType === 'demo' ? 'trial' : classItem.classType,
     date: classItem.date,
     startTime: classItem.startTime,
     endTime: classItem.endTime,

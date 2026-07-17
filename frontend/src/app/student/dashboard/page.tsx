@@ -30,6 +30,7 @@ import {
   UserRound,
   Video,
   X,
+  Bell,
 } from "lucide-react";
 import {
   getStudentDashboard,
@@ -37,7 +38,9 @@ import {
   joinClass,
   raiseAttendanceDispute,
   submitHelpRequest,
+  getStudentNotifications,
   type StudentDashboardData,
+  type StudentNotification,
 } from "@/lib/studentApi";
 import { logoutStudent, verifyStudentSession } from "@/lib/studentAuth";
 
@@ -443,6 +446,9 @@ export default function StudentDashboardPage() {
   const [activeSection, setActiveSection] = useState("overview");
   const [helpForm, setHelpForm] = useState({ name: "", subject: "", topic: "", message: "" });
   const [submittingHelp, setSubmittingHelp] = useState(false);
+  const [notifications, setNotifications] = useState<StudentNotification[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -495,6 +501,24 @@ export default function StudentDashboardPage() {
 
     void load();
   }, [router]);
+
+  useEffect(() => {
+    const loadNotifications = async () => {
+      try {
+        setLoadingNotifications(true);
+        const response = await getStudentNotifications();
+        if (response.success) {
+          setNotifications(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to load notifications:', error);
+      } finally {
+        setLoadingNotifications(false);
+      }
+    };
+
+    loadNotifications();
+  }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -771,6 +795,20 @@ export default function StudentDashboardPage() {
           </div>
 
           <div className="ml-auto flex items-center gap-1.5 lg:ml-3">
+            <button
+              type="button"
+              onClick={() => setShowNotificationModal(true)}
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#56635e] hover:bg-[#f0f3f1] transition-all"
+              aria-label="Notifications"
+              title="Notifications"
+            >
+              <Bell className="h-5 w-5" />
+              {notifications.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#e04a15] text-[10px] font-bold text-white">
+                  {notifications.length}
+                </span>
+              )}
+            </button>
             <Link
               href="/"
               className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#d5ddd8] px-2.5 text-sm font-semibold text-[#42514b] hover:bg-[#f1f4f2] transition-all hover:shadow-sm sm:px-3"
@@ -882,16 +920,32 @@ export default function StudentDashboardPage() {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                aria-label="Refresh dashboard"
-                title="Refresh dashboard"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#d5ddd8] bg-white text-[#4f5e58] hover:bg-[#eef3f0] disabled:opacity-50 shadow-sm transition-all hover:shadow-md"
-              >
-                <RefreshCw className={`h-4.5 w-4.5 ${refreshing ? "animate-spin" : ""}`} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNotificationModal(true)}
+                  className="relative lg:flex h-10 w-10 shrink-0 hidden items-center justify-center rounded-full border border-[#d5ddd8] bg-white text-[#4f5e58] hover:bg-[#eef3f0] shadow-sm transition-all hover:shadow-md"
+                  aria-label="Notifications"
+                  title="Notifications"
+                >
+                  <Bell className="h-4.5 w-4.5" />
+                  {notifications.length > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#e04a15] text-[10px] font-bold text-white">
+                      {notifications.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  aria-label="Refresh dashboard"
+                  title="Refresh dashboard"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#d5ddd8] bg-white text-[#4f5e58] hover:bg-[#eef3f0] disabled:opacity-50 shadow-sm transition-all hover:shadow-md"
+                >
+                  <RefreshCw className={`h-4.5 w-4.5 ${refreshing ? "animate-spin" : ""}`} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1631,7 +1685,7 @@ export default function StudentDashboardPage() {
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-6 border-t border-[#dce3df] bg-white/95 backdrop-blur-md px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-10px_30px_-24px_rgba(23,35,31,0.45)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-7 border-t border-[#dce3df] bg-white/95 backdrop-blur-md px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-10px_30px_-24px_rgba(23,35,31,0.45)] lg:hidden"
         aria-label="Student dashboard"
       >
         {navigation.map(({ id, href, label, icon: Icon }) => (
@@ -1639,15 +1693,86 @@ export default function StudentDashboardPage() {
             key={href}
             href={href}
             onClick={(event) => handleSectionChange(event, id)}
-            className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg text-[10px] font-semibold transition-all ${
+            className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[9px] font-semibold transition-all ${
               activeSection === id ? "text-[#e04a15] bg-[#f5e6e0]" : "text-[#73807a] hover:bg-[#f8faf9]"
             }`}
           >
             <Icon className="h-4 w-4" />
-            {label}
+            <span className="truncate px-0.5">{label}</span>
           </a>
         ))}
       </nav>
+
+      {/* Notification Modal */}
+      {showNotificationModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-[#e5eae7] px-6 py-4">
+              <h3 className="font-bold text-lg">Notifications</h3>
+              <button
+                type="button"
+                onClick={() => setShowNotificationModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#56635e] hover:bg-[#f0f3f1] transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {loadingNotifications ? (
+                <div className="px-6 py-16 text-center">
+                  <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#e04a15]" />
+                  <p className="mt-4 font-semibold">Loading notifications...</p>
+                </div>
+              ) : notifications.length ? (
+                <div className="divide-y divide-[#e8ecea]">
+                  {notifications.map((notification) => (
+                    <article key={notification._id} className="px-6 py-4 hover:bg-[#f8faf9] transition">
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-full ${
+                          notification.status === 'sent' 
+                            ? 'bg-[#e6f3ed] text-[#23604b]' 
+                            : notification.status === 'failed'
+                            ? 'bg-[#fdebe6] text-[#a3452e]'
+                            : 'bg-[#eef1ef] text-[#5e6b65]'
+                        }`}>
+                          {notification.status === 'sent' ? (
+                            <CircleCheck className="h-4 w-4" />
+                          ) : notification.status === 'failed' ? (
+                            <CircleAlert className="h-4 w-4" />
+                          ) : (
+                            <Clock3 className="h-4 w-4" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="font-semibold text-sm">{notification.content.subject || titleCase(notification.type)}</h4>
+                              <p className="mt-1 text-sm text-[#66736e]">{notification.content.body}</p>
+                            </div>
+                            <span className="flex shrink-0 items-center gap-1 text-xs text-[#85908b]">
+                              {notification.channel === 'email' && <Mail className="h-3 w-3" />}
+                              {notification.channel === 'whatsapp' && <MessageCircle className="h-3 w-3" />}
+                              {notification.sentAt && new Date(notification.sentAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-6 py-16 text-center">
+                  <Bell className="mx-auto h-10 w-10 text-[#a9b2ae]" />
+                  <p className="mt-4 font-semibold">No notifications yet</p>
+                  <p className="mt-1 text-sm text-[#75817c]">
+                    Important updates will appear here.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

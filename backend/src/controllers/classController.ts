@@ -16,6 +16,14 @@ import { classAccessDto } from '../services/batchSchedulingService';
 
 const TRIAL_RESULT_EARLY_GRACE_MINUTES = 10;
 const TRIAL_EXPIRY_DAYS = 14;
+// Trial is the only pre-enrollment class concept. "demo" is retained only
+// as a legacy value so old records continue to work; new records are always
+// created and displayed as trial classes.
+const TRIAL_CLASS_TYPES = ['trial', 'demo'] as const;
+
+function isTrialClassType(value: unknown): boolean {
+  return TRIAL_CLASS_TYPES.includes(value as typeof TRIAL_CLASS_TYPES[number]);
+}
 
 type TrialResult =
   | 'recommended'
@@ -62,7 +70,7 @@ async function assertLeadHasNoActiveTrial(
 ) {
   const query: any = {
     leadId,
-    classType: 'trial',
+    classType: { $in: TRIAL_CLASS_TYPES },
     status: ClassStatus.SCHEDULED,
     trialResult: 'pending',
   };
@@ -82,13 +90,13 @@ async function assertLeadHasNoActiveTrial(
 }
 
 async function getNextTrialAttemptNumber(leadId: mongoose.Types.ObjectId | string, session?: mongoose.ClientSession) {
-  const previousAttempts = await Class.countDocuments({ leadId, classType: 'trial' }).session(session || null);
+  const previousAttempts = await Class.countDocuments({ leadId, classType: { $in: TRIAL_CLASS_TYPES } }).session(session || null);
   return previousAttempts + 1;
 }
 
 async function expireStaleTrials(now = new Date()) {
   const pendingTrials = await Class.find({
-    classType: 'trial',
+    classType: { $in: TRIAL_CLASS_TYPES },
     status: ClassStatus.SCHEDULED,
     trialResult: 'pending',
   });
@@ -134,7 +142,8 @@ export const getClasses = async (req: AuthRequest, res: Response) => {
     
     if (sanitizedStatus) filter.status = sanitizedStatus;
     const sanitizedClassType = sanitizeQueryParam(classType);
-    if (sanitizedClassType) filter.classType = sanitizedClassType;
+    if (sanitizedClassType === 'trial' || sanitizedClassType === 'demo') filter.classType = { $in: TRIAL_CLASS_TYPES };
+    else if (sanitizedClassType) filter.classType = sanitizedClassType;
     if (req.user?.role === 'coach') filter.coach = req.user.userId;
     else if (sanitizedCoach) filter.coach = sanitizedCoach;
     if (sanitizedStudent) filter.students = sanitizedStudent;
@@ -221,7 +230,7 @@ export const getClassById = async (req: AuthRequest, res: Response) => {
 
     res.json({
       success: true,
-      data: classData,
+      data: { ...classData, classType: classData.classType === 'demo' ? 'trial' : classData.classType },
     });
   } catch (error: any) {
     console.error('Error fetching class:', error);
@@ -608,7 +617,7 @@ export const cancelClass = async (req: AuthRequest, res: Response) => {
     existingClass.cancellationReason = reason;
     await existingClass.save();
 
-    if (existingClass.classType === 'trial' && existingClass.leadId) {
+    if (isTrialClassType(existingClass.classType) && existingClass.leadId) {
       const Lead = (await import('../models/Lead')).default;
       const { LeadStatus } = await import('../models/Lead');
       await Lead.updateOne(
@@ -913,7 +922,7 @@ export const getMyClasses = async (req: ClientAuthRequest, res: Response) => {
         return {
           _id: classItem._id.toString(),
           course: classItem.course,
-          classType: classItem.classType,
+          classType: classItem.classType === 'demo' ? 'trial' : classItem.classType,
           date: classItem.date,
           startTime: classItem.startTime,
           endTime: classItem.endTime,
@@ -1148,7 +1157,7 @@ export const rescheduleTrialClass = async (req: AuthRequest, res: Response) => {
   try {
     const { date, startTime, endTime, timezone, meetingLink } = req.body;
     const classData = await Class.findById(req.params.id).session(session);
-    if (!classData || classData.classType !== 'trial') {
+    if (!classData || !isTrialClassType(classData.classType)) {
       await session.abortTransaction();
       return res.status(404).json({ success: false, error: 'Trial class not found' });
     }
@@ -1258,7 +1267,7 @@ export const markTrialResult = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, error: 'Class not found' });
     }
 
-    if (classData.classType !== 'trial') {
+    if (!isTrialClassType(classData.classType)) {
       return res.status(400).json({ 
         success: false, 
         error: 'This is not a trial class' 
@@ -1341,7 +1350,7 @@ export const getTrialClasses = async (req: AuthRequest, res: Response) => {
     const { status, coach } = req.query;
     await expireStaleTrials();
 
-    const filter: any = { classType: 'trial' };
+    const filter: any = { classType: { $in: TRIAL_CLASS_TYPES } };
     if (status) filter.trialResult = status;
     if (coach) filter.coach = coach;
 
@@ -1356,7 +1365,8 @@ export const getTrialClasses = async (req: AuthRequest, res: Response) => {
 
     res.json({
       success: true,
-      data: trialClasses,
+      // The report and admin UI use one canonical term for this workflow.
+      data: trialClasses.map((trialClass: any) => ({ ...trialClass, classType: 'trial' })),
     });
   } catch (error: any) {
     console.error('Error fetching trial classes:', error);
@@ -1378,7 +1388,7 @@ export const joinTrialClass = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     const classData = await Class.findById(id);
-    if (!classData || classData.classType !== 'trial') {
+    if (!classData || !isTrialClassType(classData.classType)) {
       return res.status(404).json({ success: false, error: 'Trial class not found' });
     }
     if (classData.status !== ClassStatus.SCHEDULED || classData.trialResult === 'expired') {

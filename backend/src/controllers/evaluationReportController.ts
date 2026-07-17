@@ -11,6 +11,13 @@ import Staff, { StaffRole, StaffStatus } from '../models/Staff';
 import { primaryFrontendUrl } from '../utils/frontendUrl';
 import { sanitizePaginationParams, sanitizeQueryParam } from '../utils/validation';
 
+function reportAccessFilter(req: AuthRequest): Record<string, string> {
+  // A coach can work only with report cards bearing their own coach ID.
+  // Permissions decide whether a coach can open this workspace; this scope
+  // prevents an ID in the URL from exposing or mutating another coach's work.
+  return req.user?.role === StaffRole.COACH ? { coach: req.user.userId } : {};
+}
+
 export const getEvaluationReports = async (req: AuthRequest, res: Response) => {
   try {
     const { student, package: packageId, coach, recommendedNextLevel, page = '1', limit = '100' } = req.query;
@@ -23,7 +30,8 @@ export const getEvaluationReports = async (req: AuthRequest, res: Response) => {
     const sanitizedNextLevel = sanitizeQueryParam(recommendedNextLevel);
     if (sanitizedStudent) filter.student = sanitizedStudent;
     if (sanitizedPackage) filter.package = sanitizedPackage;
-    if (sanitizedCoach) filter.coach = sanitizedCoach;
+    if (req.user?.role === StaffRole.COACH) filter.coach = req.user.userId;
+    else if (sanitizedCoach) filter.coach = sanitizedCoach;
     if (sanitizedNextLevel) filter.recommendedNextLevel = sanitizedNextLevel;
 
     const { page: pageNum, limit: limitNum } = sanitizePaginationParams(page, limit);
@@ -63,7 +71,7 @@ export const getEvaluationReports = async (req: AuthRequest, res: Response) => {
 
 export const getEvaluationReportById = async (req: AuthRequest, res: Response) => {
   try {
-    const report = await EvaluationReport.findById(req.params.id)
+    const report = await EvaluationReport.findOne({ _id: req.params.id, ...reportAccessFilter(req) })
       .populate('student', 'studentName parentName email phone')
       .populate('package', 'packageType courseLevel status')
       .populate('coach', 'name email');
@@ -186,7 +194,7 @@ export const updateEvaluationReport = async (req: AuthRequest, res: Response) =>
     const ipAddress = req.ipAddress || 'unknown';
     const userAgent = req.userAgent || 'unknown';
 
-    const existingReport = await EvaluationReport.findById(req.params.id);
+    const existingReport = await EvaluationReport.findOne({ _id: req.params.id, ...reportAccessFilter(req) });
     if (!existingReport) {
       return res.status(404).json({
         success: false,
@@ -200,8 +208,8 @@ export const updateEvaluationReport = async (req: AuthRequest, res: Response) =>
       });
     }
 
-    const report = await EvaluationReport.findByIdAndUpdate(
-      req.params.id,
+    const report = await EvaluationReport.findOneAndUpdate(
+      { _id: req.params.id, ...reportAccessFilter(req) },
       { $set: req.body },
       { new: true, runValidators: true }
     );
@@ -295,7 +303,7 @@ export const publishEvaluationReport = async (req: AuthRequest, res: Response) =
     const ipAddress = req.ipAddress || 'unknown';
     const userAgent = req.userAgent || 'unknown';
 
-    const report = await EvaluationReport.findById(req.params.id)
+    const report = await EvaluationReport.findOne({ _id: req.params.id, ...reportAccessFilter(req) })
       .populate('student', 'studentName parentName email phoneNumber')
       .populate('coach', 'name');
 
@@ -364,7 +372,7 @@ export const getStudentEvaluationReports = async (req: AuthRequest, res: Respons
   try {
     const { studentId } = req.params;
 
-    const reports = await EvaluationReport.find({ student: studentId })
+    const reports = await EvaluationReport.find({ student: studentId, ...reportAccessFilter(req) })
       .populate('package', 'packageType courseLevel status')
       .populate('coach', 'name email')
       .sort({ createdAt: -1 });
@@ -386,7 +394,7 @@ export const getPackageEvaluationReport = async (req: AuthRequest, res: Response
   try {
     const { packageId } = req.params;
 
-    const report = await EvaluationReport.findOne({ package: packageId })
+    const report = await EvaluationReport.findOne({ package: packageId, ...reportAccessFilter(req) })
       .populate('student', 'studentName parentName email phone')
       .populate('package', 'packageType courseLevel status')
       .populate('coach', 'name email');

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, Eye, FileText, Loader2, Pencil, Plus, Search, Send } from "lucide-react";
+import { Download, Eye, Loader2, Pencil, Plus, Search, Send } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import Modal from "@/components/admin/Modal";
 import {
@@ -24,7 +24,7 @@ import {
   type StaffMember,
   type StudentPackage,
 } from "@/lib/adminApi";
-import { hasPermission } from "@/lib/auth";
+import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { formatCourseLevel } from "@/lib/labels";
 
 type ReportForm = Omit<EvaluationReportPayload, "strengths" | "weaknesses"> & {
@@ -89,6 +89,11 @@ function downloadReport(report: EvaluationReport) {
 }
 
 export default function StaffReportCardsPage() {
+  const currentUser = getCurrentUser();
+  const isCoach = currentUser?.role === "coach";
+  const currentUserId = currentUser?.id;
+  const currentUserName = currentUser?.name;
+  const currentUserEmail = currentUser?.email;
   const canCreate = hasPermission("create_report_card");
   const canExport = hasPermission("export_report_card");
   const [reports, setReports] = useState<EvaluationReport[]>([]);
@@ -98,12 +103,17 @@ export default function StaffReportCardsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [coachFilter, setCoachFilter] = useState("");
+  const [dateFromFilter, setDateFromFilter] = useState("");
+  const [dateToFilter, setDateToFilter] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [viewReport, setViewReport] = useState<EvaluationReport | null>(null);
   const [editingReport, setEditingReport] = useState<EvaluationReport | null>(null);
   const [form, setForm] = useState<ReportForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [publishTarget, setPublishTarget] = useState<EvaluationReport | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,20 +122,22 @@ export default function StaffReportCardsPage() {
       const [reportResponse, packageResponse, coachResponse] = await Promise.all([
         getEvaluationReports(),
         getPackages({ status: "completed" }),
-        getStaffList("coach"),
+        isCoach ? Promise.resolve(null) : getStaffList("coach"),
       ]);
       if (!reportResponse.success) throw new Error(reportResponse.error || "Failed to load reports");
       if (!packageResponse.success) throw new Error(packageResponse.error || "Failed to load eligible packages");
-      if (!coachResponse.success) throw new Error(coachResponse.error || "Failed to load coaches");
+      if (coachResponse && !coachResponse.success) throw new Error(coachResponse.error || "Failed to load coaches");
       setReports(reportResponse.data || []);
       setPackages(packageResponse.data || []);
-      setCoaches((coachResponse.data || []).filter((coach) => coach.status === "active"));
+      setCoaches(isCoach && currentUserId && currentUserName && currentUserEmail
+        ? [{ _id: currentUserId, name: currentUserName, email: currentUserEmail, role: "coach", status: "active", createdAt: "" }]
+        : (coachResponse?.data || []).filter((coach) => coach.status === "active"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not connect to the server.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUserEmail, currentUserId, currentUserName, isCoach]);
 
   useEffect(() => {
     void load();
@@ -133,12 +145,24 @@ export default function StaffReportCardsPage() {
 
   const filteredReports = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return reports;
-    return reports.filter((report) =>
-      [entityName(report.student), entityName(report.coach), report.title, packageLabel(report.package)]
-        .some((value) => value.toLowerCase().includes(query))
-    );
-  }, [reports, search]);
+    return reports.filter((report) => {
+      const matchesSearch = !query || 
+        [entityName(report.student), entityName(report.coach), report.title, packageLabel(report.package)]
+          .some((value) => value.toLowerCase().includes(query));
+      
+      const matchesStatus = !statusFilter || 
+        (statusFilter === "published" ? report.isPublished : !report.isPublished);
+      
+      const matchesCoach = !coachFilter || 
+        (typeof report.coach === "string" ? report.coach : report.coach._id) === coachFilter;
+      
+      const reportDate = new Date(report.createdAt);
+      const matchesDateFrom = !dateFromFilter || reportDate >= new Date(dateFromFilter);
+      const matchesDateTo = !dateToFilter || reportDate <= new Date(dateToFilter);
+      
+      return matchesSearch && matchesStatus && matchesCoach && matchesDateFrom && matchesDateTo;
+    });
+  }, [reports, search, statusFilter, coachFilter, dateFromFilter, dateToFilter]);
 
   const usedPackageIds = useMemo(
     () => new Set(reports.map((report) => typeof report.package === "string" ? report.package : report.package._id)),
@@ -148,7 +172,7 @@ export default function StaffReportCardsPage() {
 
   const openCreate = () => {
     setEditingReport(null);
-    setForm({ ...EMPTY_FORM, coach: coaches.length === 1 ? coaches[0]._id : "" });
+    setForm({ ...EMPTY_FORM, coach: isCoach && currentUser ? currentUser.id : coaches.length === 1 ? coaches[0]._id : "" });
     setFormOpen(true);
   };
 
@@ -213,12 +237,12 @@ export default function StaffReportCardsPage() {
   };
 
   const handlePublish = async (report: EvaluationReport) => {
-    if (!window.confirm(`Publish ${report.title} for ${entityName(report.student)}? Published reports cannot be edited.`)) return;
     setPublishingId(report._id);
     setError("");
     try {
       const response = await publishEvaluationReport(report._id);
       if (!response.success) throw new Error(response.error || "Failed to publish report");
+      setPublishTarget(null);
       setMessage("Report published and the parent notification was queued.");
       await load();
     } catch (err) {
@@ -257,6 +281,61 @@ export default function StaffReportCardsPage() {
         </label>
       </div>
 
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="admin-control admin-control-select"
+        >
+          <option value="">All statuses</option>
+          <option value="published">Published</option>
+          <option value="draft">Draft</option>
+        </select>
+        {!isCoach && (
+          <select
+            value={coachFilter}
+            onChange={(e) => setCoachFilter(e.target.value)}
+            className="admin-control admin-control-select"
+          >
+            <option value="">All coaches</option>
+            {coaches.map((coach) => (
+              <option key={coach._id} value={coach._id}>{coach.name}</option>
+            ))}
+          </select>
+        )}
+        <input
+          type="date"
+          value={dateFromFilter}
+          onChange={(e) => setDateFromFilter(e.target.value)}
+          className="admin-control"
+          placeholder="From date"
+        />
+        <input
+          type="date"
+          value={dateToFilter}
+          onChange={(e) => setDateToFilter(e.target.value)}
+          className="admin-control"
+          placeholder="To date"
+        />
+        {(statusFilter || coachFilter || dateFromFilter || dateToFilter) && (
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter("");
+              setCoachFilter("");
+              setDateFromFilter("");
+              setDateToFilter("");
+            }}
+            className="text-sm font-semibold text-[var(--color-muted)] hover:text-[var(--color-walnut)]"
+          >
+            Clear filters
+          </button>
+        )}
+        <span className="text-sm text-[var(--color-muted)]">
+          Showing {filteredReports.length} of {reports.length} report cards
+        </span>
+      </div>
+
       <div className="admin-table-shell">
         <table className="admin-table min-w-full">
           <thead>
@@ -283,7 +362,7 @@ export default function StaffReportCardsPage() {
                   {!report.isPublished && canCreate && (
                     <>
                       <button type="button" onClick={() => openEdit(report)} className="admin-icon-button mr-2" aria-label="Edit draft"><Pencil className="h-4 w-4" /></button>
-                      <button type="button" onClick={() => handlePublish(report)} disabled={publishingId === report._id} className="admin-icon-button mr-2" aria-label="Publish report">
+                      <button type="button" onClick={() => setPublishTarget(report)} disabled={publishingId === report._id} className="admin-icon-button mr-2" aria-label="Publish report">
                         {publishingId === report._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                       </button>
                     </>
@@ -298,7 +377,6 @@ export default function StaffReportCardsPage() {
         </table>
         {filteredReports.length === 0 && (
           <div className="admin-empty">
-            <FileText className="mx-auto mb-3 h-8 w-8 text-[var(--color-muted)]" />
             No report cards found. Completed packages without an existing report are eligible.
           </div>
         )}
@@ -315,10 +393,14 @@ export default function StaffReportCardsPage() {
             </select>
           </FormField>
           <FormField label="Coach" required>
-            <select required disabled={Boolean(editingReport)} value={form.coach} onChange={(event) => setForm({ ...form, coach: event.target.value })} className={selectClass}>
-              <option value="">Select a coach</option>
-              {coaches.map((coach) => <option key={coach._id} value={coach._id}>{coach.name}</option>)}
-            </select>
+            {isCoach ? (
+              <input readOnly value={currentUser?.name || "Your coach profile"} className={`${inputClass} cursor-not-allowed bg-[var(--color-ivory)]`} aria-label="Coach" />
+            ) : (
+              <select required disabled={Boolean(editingReport)} value={form.coach} onChange={(event) => setForm({ ...form, coach: event.target.value })} className={selectClass}>
+                <option value="">Select a coach</option>
+                {coaches.map((coach) => <option key={coach._id} value={coach._id}>{coach.name}</option>)}
+              </select>
+            )}
           </FormField>
           <FormField label="Title" required><input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={inputClass} maxLength={200} /></FormField>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -370,6 +452,16 @@ export default function StaffReportCardsPage() {
             )}
           </div>
         )}
+      </Modal>
+
+      <Modal open={Boolean(publishTarget)} onClose={() => !publishingId && setPublishTarget(null)} title="Publish Report Card" maxWidth="max-w-md">
+        <div className="space-y-5">
+          <p className="text-sm text-[var(--color-walnut)]">Publish <strong>{publishTarget?.title}</strong> for <strong>{publishTarget ? entityName(publishTarget.student) : "this student"}</strong>? It will become visible in the student portal and can no longer be edited.</p>
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setPublishTarget(null)} disabled={Boolean(publishingId)} className={secondaryButtonClass}>Keep draft</button>
+            <button type="button" onClick={() => publishTarget && void handlePublish(publishTarget)} disabled={Boolean(publishingId)} className={primaryButtonClass}>{publishingId && <Loader2 className="h-4 w-4 animate-spin" />}Publish report</button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

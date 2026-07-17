@@ -53,18 +53,46 @@ export function effectiveEventStatus(event: Pick<IAcademyEvent, 'status' | 'date
   return eventWindow(event).endAt <= now ? AcademyEventStatus.COMPLETED : AcademyEventStatus.SCHEDULED;
 }
 
+/**
+ * Persist the lifecycle transition for finished events.  The student and
+ * admin views should never disagree about whether an event is still live,
+ * and relying only on a calculated display status made filtering unreliable.
+ */
+export async function completeEndedAcademyEvents(now = new Date()): Promise<number> {
+  const candidates = await AcademyEvent.find({
+    status: AcademyEventStatus.SCHEDULED,
+    date: { $lte: now },
+  })
+    .select('_id date startTime durationMinutes timezone')
+    .lean();
+
+  const completedIds = candidates
+    .filter((event: any) => eventWindow(event).endAt <= now)
+    .map((event: any) => event._id);
+
+  if (completedIds.length === 0) return 0;
+  const result = await AcademyEvent.updateMany(
+    { _id: { $in: completedIds }, status: AcademyEventStatus.SCHEDULED },
+    { $set: { status: AcademyEventStatus.COMPLETED, completedAt: now } }
+  );
+  return result.modifiedCount;
+}
+
 export function isEventJoinOpen(event: Pick<IAcademyEvent, 'status' | 'date' | 'startTime' | 'durationMinutes'> & { timezone: string }, now = new Date()) {
   const { accessOpensAt, startAt, endAt } = eventWindow(event);
   return event.status === AcademyEventStatus.SCHEDULED && now >= accessOpensAt && now <= endAt;
 }
 
 export async function findEligibleRunningBatchIds(criteria: AcademyEventCriteria, session?: mongoose.ClientSession): Promise<mongoose.Types.ObjectId[]> {
+  // Masterclass: same country + same timezone + same course level
+  // Tournament: same country + same timezone (any course level)
+  
   const batchQuery = Batch.find({
     status: BatchStatus.ONGOING,
-    timezone: criteria.timezone,
+    timezone: criteria.timezone, // Both require same timezone
     ...(criteria.type === AcademyEventType.MASTERCLASS
       ? { courseLevel: criteria.level === 'Expert' ? { $in: ['Expert', 'Master'] } : criteria.level }
-      : {}),
+      : {}), // Tournament: any course level
   }).select('_id students');
   if (session) batchQuery.session(session);
   const batches = await batchQuery.lean();
@@ -73,7 +101,7 @@ export async function findEligibleRunningBatchIds(criteria: AcademyEventCriteria
   const studentIds = batches.flatMap((batch) => (batch.students || []).map((id) => id.toString()));
   const studentQuery = Student.find({
     _id: { $in: studentIds },
-    country: criteria.country,
+    country: criteria.country, // Both require same country
     portalStatus: { $nin: ['frozen', 'expired'] },
   }).select('_id');
   if (session) studentQuery.session(session);
@@ -98,7 +126,7 @@ export async function resolveEventEligibility(criteria: AcademyEventCriteria, se
   if (eligibleBatchIds.length === 0) {
     throw new AcademyEventError(
       criteria.type === AcademyEventType.MASTERCLASS
-        ? 'No running batch matches the selected country, timezone, and level'
+        ? 'No running batch matches the selected country, timezone, and course level'
         : 'No running batch matches the selected country and timezone'
     );
   }
@@ -132,6 +160,7 @@ export async function refreshEventEligibility(event: IAcademyEvent, session?: mo
 }
 
 export async function getStudentEventView(studentId: string) {
+  await completeEndedAcademyEvents();
   const student = await Student.findById(studentId).select('country timezone currentBatchId portalStatus').lean();
   if (!student || !student.currentBatchId || !student.country) return [];
   const runningBatch = await Batch.exists({ _id: student.currentBatchId, status: BatchStatus.ONGOING });

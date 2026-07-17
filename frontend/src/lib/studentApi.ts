@@ -71,7 +71,7 @@ export interface StudentDashboardData {
   upcomingClasses: {
     _id: string;
     course: string;
-    classType: "regular" | "master" | "extra" | "trial" | "demo" | string;
+    classType: "regular" | "master" | "extra" | "trial" | string;
     date: string;
     startTime: string;
     endTime: string;
@@ -126,7 +126,7 @@ export const getStudentDashboard = () =>
 export interface StudentClassItem {
   _id: string;
   course: string;
-  classType: "regular" | "master" | "extra" | "trial" | "demo" | string;
+  classType: "regular" | "master" | "extra" | "trial" | string;
   date: string;
   startTime: string;
   endTime: string;
@@ -180,3 +180,20 @@ export const submitHelpRequest = (name: string, subject: string, topic: string, 
     method: "POST",
     body: JSON.stringify({ name, subject, topic, message }),
   });
+
+export interface StudentNotification {
+  _id: string;
+  type: string;
+  channel: string;
+  status: string;
+  content: {
+    subject?: string;
+    body: string;
+    data?: Record<string, any>;
+  };
+  sentAt?: string;
+  createdAt: string;
+}
+
+export const getStudentNotifications = () =>
+  studentFetchJSON<{ success: boolean; data: StudentNotification[]; error?: string }>("/notifications/my");

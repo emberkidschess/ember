@@ -202,7 +202,7 @@ export default function StudentsPage() {
                     <td className="px-5 py-3.5">
                       <p className="flex items-center gap-1.5 text-xs text-[var(--color-muted)]"><Mail className="h-3 w-3" /> {student.email}</p>
                       <p className="flex items-center gap-1.5 text-xs text-[var(--color-muted)] mt-0.5">
-                        <Phone className="h-3 w-3" /> {COUNTRY_OPTIONS.find((c) => c.code === student.country)?.dialCode || "+1"} {formatPhoneInput(student.phoneNumber, student.country)}
+                        <Phone className="h-3 w-3" /> {student.phoneNumber ? `${COUNTRY_OPTIONS.find((c) => c.code === student.country)?.dialCode || "+1"} ${formatPhoneInput(student.phoneNumber, student.country)}` : "—"}
                       </p>
                     </td>
                     <td className="px-5 py-3.5 text-[var(--color-walnut)]">{student.course}</td>

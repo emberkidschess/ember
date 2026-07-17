@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Notification, { NotificationStatus, NotificationType } from '../models/Notification';
 import DeliveryLog, { DeliveryStatus } from '../models/DeliveryLog';
 import { AuthRequest } from '../middleware/auth';
+import { ClientAuthRequest } from '../middleware/clientAuth';
 import { retryFailedNotifications, retryNotificationById, sendNotification } from '../utils/notificationProcessor';
 import { sanitizeQueryParam } from '../utils/validation';
 
@@ -33,6 +34,38 @@ export const getNotifications = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Error fetching notifications:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch notifications',
+    });
+  }
+};
+
+export const getStudentNotifications = async (req: ClientAuthRequest, res: Response) => {
+  try {
+    const studentId = req.studentUser?.id;
+    if (!studentId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+      });
+    }
+
+    const notifications = await Notification.find({
+      recipient: studentId,
+      recipientType: 'Student',
+    })
+      .select('type channel status content sentAt createdAt')
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    res.json({
+      success: true,
+      data: notifications,
+    });
+  } catch (error) {
+    console.error('Error fetching student notifications:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch notifications',

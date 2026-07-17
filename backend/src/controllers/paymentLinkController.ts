@@ -33,6 +33,7 @@ import {
 } from '../services/enrollmentLifecycleService';
 import { sanitizePaginationParams, sanitizeQueryParam } from '../utils/validation';
 import { CacheService, CacheNamespaces } from '../utils/cache';
+import { addStudentsToScheduledBatchClasses } from '../services/batchSchedulingService';
 
 type PaymentLinkShareChannel = 'email' | 'whatsapp' | 'copy_link';
 type PaymentLinkDeliveryFailure = { channel: PaymentLinkShareChannel; error: string };
@@ -1120,9 +1121,18 @@ export const activatePackage = async (req: AuthRequest, res: Response) => {
       $set: {
         schedule,
         timezone: timezone || batchDoc.timezone || 'America/New_York',
-        ...(batchDoc.status === BatchStatus.UPCOMING ? { status: BatchStatus.ONGOING } : {}),
       },
     }, { session, runValidators: true });
+
+    // Automation creates the batch's recurring classes up front.  A student
+    // activated later must therefore be added to those future sessions and
+    // receive attendance placeholders in the same transaction; otherwise
+    // their portal shows a batch with no classes to join.
+    await addStudentsToScheduledBatchClasses(
+      batchDoc._id,
+      [paymentLink.student.toString()],
+      { session }
+    );
 
     // Queued renewals remain behind the currently active plan and are
     // switched on atomically when its final session is consumed.
@@ -1189,6 +1199,10 @@ export const activatePackage = async (req: AuthRequest, res: Response) => {
     if (paymentLink.lead) {
       await CacheService.deletePattern(`${CacheNamespaces.DASHBOARD_STATS}:*`);
     }
+    await Promise.all([
+      CacheService.deletePattern(`${CacheNamespaces.BATCH_LIST}:*`),
+      CacheService.deletePattern(`${CacheNamespaces.STUDENT_LIST}:*`),
+    ]);
 
     // Send welcome notification outside the transaction - email
     // failures should not roll back a successful activation.

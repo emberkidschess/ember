@@ -230,7 +230,7 @@ export const defaultSiteConfig: SiteConfigResponse = {
     { name: "Prodigies", href: "/prodigies" },
     { name: "Contact", href: "/contact" },
   ],
-  primaryCta: { label: 'Book a Free Trial' },
+  primaryCta: { label: 'Book a Free Trial', href: '/contact' },
   secondaryCta: { label: 'View Courses', href: '/courses' },
   socialLinks: buildDefaultSocialLinks(defaultSiteProfile),
 };

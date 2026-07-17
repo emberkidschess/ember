@@ -53,8 +53,10 @@ export default function AcademyEventManager({ type, title, description }: { type
   const [message, setMessage] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<AcademyEvent | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<AcademyEvent | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const [form, setForm] = useState<EventForm>(() => emptyForm(type));
-  const [query, setQuery] = useState({ country: "", timezone: "", coach: "", level: "", date: "", status: "" });
+  const [query, setQuery] = useState({ country: "", coach: "", level: "", date: "", status: "" });
   const [draftQuery, setDraftQuery] = useState(query);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -81,7 +83,6 @@ export default function AcademyEventManager({ type, title, description }: { type
 
   const filteredEvents = useMemo(() => events.filter((event) => (
     (!query.country || event.country === query.country) &&
-    (!query.timezone || event.timezone === query.timezone) &&
     (!query.coach || event.coach?._id === query.coach) &&
     (!query.level || event.level === query.level) &&
     (!query.date || event.date.slice(0, 10) === query.date) &&
@@ -96,7 +97,7 @@ export default function AcademyEventManager({ type, title, description }: { type
     setFiltersOpen(false);
   };
   const clearFilters = () => {
-    const cleared = { country: "", timezone: "", coach: "", level: "", date: "", status: "" };
+    const cleared = { country: "", coach: "", level: "", date: "", status: "" };
     setDraftQuery(cleared);
     setQuery(cleared);
   };
@@ -135,10 +136,22 @@ export default function AcademyEventManager({ type, title, description }: { type
   };
 
   const cancel = async (event: AcademyEvent) => {
-    if (!window.confirm(`Cancel ${event.name}?`)) return;
-    const response = await cancelAcademyEvent(type, event._id);
-    if (!response.success) setError(response.error || "Could not cancel event");
-    else { setMessage("Event cancelled."); await load(); }
+    setCancelling(true);
+    setError("");
+    try {
+      const response = await cancelAcademyEvent(type, event._id);
+      if (!response.success) {
+        setError(response.error || "Could not cancel event");
+        return;
+      }
+      setCancelTarget(null);
+      setMessage("Event cancelled. Students can no longer join it.");
+      await load();
+    } catch {
+      setError("Could not connect to the server.");
+    } finally {
+      setCancelling(false);
+    }
   };
 
   return (
@@ -157,7 +170,6 @@ export default function AcademyEventManager({ type, title, description }: { type
       {filtersOpen && <div className="mb-6 rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] p-4 shadow-sm">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <select className="admin-control admin-control-select" value={draftQuery.country} onChange={(e) => updateDraftQuery("country", e.target.value)}><option value="">All countries</option>{COUNTRIES.map((country) => <option key={country}>{country}</option>)}</select>
-          <select className="admin-control admin-control-select" value={draftQuery.timezone} onChange={(e) => updateDraftQuery("timezone", e.target.value)}><option value="">All time zones</option>{TIMEZONES.map((timezone) => <option key={timezone}>{timezone}</option>)}</select>
           {type === "masterclass" && <select className="admin-control admin-control-select" value={draftQuery.coach} onChange={(e) => updateDraftQuery("coach", e.target.value)}><option value="">All coaches</option>{coaches.map((coach) => <option key={coach._id} value={coach._id}>{coach.name}</option>)}</select>}
           {type === "masterclass" && <select className="admin-control admin-control-select" value={draftQuery.level} onChange={(e) => updateDraftQuery("level", e.target.value)}><option value="">All levels</option>{LEVELS.map((level) => <option key={level}>{level}</option>)}</select>}
           <input type="date" aria-label="Filter by date" className="admin-control" value={draftQuery.date} onChange={(e) => updateDraftQuery("date", e.target.value)} />
@@ -171,8 +183,8 @@ export default function AcademyEventManager({ type, title, description }: { type
 
       <div className="admin-table-shell">
         {loading ? <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" /></div> : filteredEvents.length === 0 ? <div className="admin-empty">No {type} history found.</div> : (
-          <table className="admin-table min-w-full"><thead><tr><th className="text-left">Name</th><th className="text-left">Coach</th><th className="text-left">Country / Time zone</th>{type === "masterclass" && <th className="text-left">Level</th>}<th className="text-left">Date & time</th><th className="text-left">Status</th><th className="text-right">Actions</th></tr></thead><tbody>
-            {filteredEvents.map((event) => <tr key={event._id}><td className="admin-primary-cell">{event.name}<span className="block text-xs text-[var(--color-muted)]">{event.eligibleBatchCount || 0} eligible batch(es)</span></td><td>{event.coach?.name || "All coaches"}</td><td>{event.country}<span className="block text-xs text-[var(--color-muted)]">{event.timezone}</span></td>{type === "masterclass" && <td>{event.level || "—"}</td>}<td>{displayDate(event.date)}<span className="block text-xs text-[var(--color-muted)]">{event.startTime}</span></td><td><StatusBadge status={event.status} /></td><td className="text-right"><a href={event.meetingLink} target="_blank" rel="noreferrer" className="admin-icon-button mr-2" aria-label="Open event link"><ExternalLink className="h-4 w-4" /></a>{event.status === "scheduled" && <><button onClick={() => openEdit(event)} className="admin-icon-button mr-2" aria-label="Edit event"><Pencil className="h-4 w-4" /></button><button onClick={() => cancel(event)} className="admin-icon-button admin-icon-button-danger" aria-label="Cancel event"><XCircle className="h-4 w-4" /></button></>}</td></tr>)}
+          <table className="admin-table min-w-full"><thead><tr><th className="text-left">Name</th>{type === "masterclass" && <th className="text-left">Coach</th>}<th className="text-left">Country / Time zone</th>{type === "masterclass" && <th className="text-left">Level</th>}<th className="text-left">Date & time</th><th className="text-left">Status</th><th className="text-right">Actions</th></tr></thead><tbody>
+            {filteredEvents.map((event) => <tr key={event._id}><td className="admin-primary-cell">{event.name}<span className="block text-xs text-[var(--color-muted)]">{event.eligibleBatchCount || 0} eligible batch(es)</span></td>{type === "masterclass" && <td>{event.coach?.name || "—"}</td>}<td>{event.country}<span className="block text-xs text-[var(--color-muted)]">{event.timezone}</span></td>{type === "masterclass" && <td>{event.level || "—"}</td>}<td>{displayDate(event.date)}<span className="block text-xs text-[var(--color-muted)]">{event.startTime}</span></td><td><StatusBadge status={event.status} /></td><td className="text-right"><a href={event.meetingLink} target="_blank" rel="noreferrer" className="admin-icon-button mr-2" aria-label="Open event link"><ExternalLink className="h-4 w-4" /></a>{event.status === "scheduled" && <><button onClick={() => openEdit(event)} className="admin-icon-button mr-2" aria-label="Edit event"><Pencil className="h-4 w-4" /></button><button onClick={() => setCancelTarget(event)} className="admin-icon-button admin-icon-button-danger" aria-label="Cancel event"><XCircle className="h-4 w-4" /></button></>}</td></tr>)}
           </tbody></table>
         )}
       </div>
@@ -188,6 +200,16 @@ export default function AcademyEventManager({ type, title, description }: { type
           <p className="rounded-xl bg-[var(--color-ivory)] px-3 py-2 text-xs text-[var(--color-muted)]"><Trophy className="mr-1 inline h-3.5 w-3.5" />Eligible running batches are detected automatically by the selected criteria. Manual batch selection is not available.</p>
           <div className="flex justify-end gap-3"><button type="button" onClick={() => setFormOpen(false)} className={secondaryButtonClass}>Cancel</button><button type="submit" disabled={saving} className={primaryButtonClass}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarPlus className="h-4 w-4" />}{editing ? "Save changes" : "Create event"}</button></div>
         </form>
+      </Modal>
+
+      <Modal open={Boolean(cancelTarget)} onClose={() => !cancelling && setCancelTarget(null)} title={`Cancel ${type === "masterclass" ? "Masterclass" : "Tournament"}`} maxWidth="max-w-md">
+        <div className="space-y-5">
+          <p className="text-sm text-[var(--color-walnut)]">Cancel <strong>{cancelTarget?.name}</strong>? Students will no longer be able to join this event. This action cannot be undone.</p>
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setCancelTarget(null)} disabled={cancelling} className={secondaryButtonClass}>Keep event</button>
+            <button type="button" onClick={() => cancelTarget && void cancel(cancelTarget)} disabled={cancelling} className="inline-flex h-[44px] items-center justify-center gap-2 rounded-[14px] bg-[var(--color-ember)] px-5 text-sm font-bold text-white transition hover:bg-[var(--color-ember-deep)] disabled:cursor-not-allowed disabled:opacity-50">{cancelling && <Loader2 className="h-4 w-4 animate-spin" />}Cancel event</button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

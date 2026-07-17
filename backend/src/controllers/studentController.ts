@@ -10,7 +10,7 @@ import { validateStaff, validateLead, validatePackage } from '../utils/foreignKe
 import { buildAuditLogData } from '../middleware/auditLogger';
 import { sanitizeQueryParam, sanitizePaginationParams } from '../utils/validation';
 import { CacheService, generateCacheKey, CacheNamespaces } from '../utils/cache';
-import { classAccessWindow, localCalendarDateAsUtc } from '../utils/dateTime';
+import { classAccessWindow, classWindow, localCalendarDateAsUtc } from '../utils/dateTime';
 import { ClientAuthService } from '../services/clientAuthService';
 import { getCourseSessionTotal, isCourseLevel } from '../domain/courseEnrollment';
 
@@ -34,6 +34,8 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
     if (sanitizedStatus) filter.studentStatus = sanitizedStatus;
     if (sanitizedEnrollmentStatus) filter.enrollmentStatus = sanitizedEnrollmentStatus;
     if (sanitizedCourse) filter.course = sanitizedCourse;
+    const scopedCoach = req.user?.role === 'coach' ? req.user.userId : undefined;
+    if (scopedCoach) filter.assignedStaff = scopedCoach;
 
     const { page: pageNum, limit: limitNum } = sanitizePaginationParams(page, limit);
     const skip = (pageNum - 1) * limitNum;
@@ -41,7 +43,7 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
     // Generate cache key based on filters and pagination
     const cacheKey = generateCacheKey(
       CacheNamespaces.STUDENT_LIST,
-      `${sanitizedStatus}-${sanitizedEnrollmentStatus}-${sanitizedCourse}-${pageNum}-${limitNum}`
+      `${req.user?.role}-${scopedCoach || 'all'}-${sanitizedStatus}-${sanitizedEnrollmentStatus}-${sanitizedCourse}-${pageNum}-${limitNum}`
     );
 
     // Try to get from cache first
@@ -119,6 +121,14 @@ export const getStudentById = async (req: AuthRequest, res: Response) => {
         success: false,
         error: 'Student not found',
       });
+    }
+    if (req.user?.role === 'coach') {
+      const assignedStaffId = student.assignedStaff && typeof student.assignedStaff === 'object' && '_id' in student.assignedStaff
+        ? String((student.assignedStaff as any)._id)
+        : String(student.assignedStaff || '');
+      if (assignedStaffId !== req.user.userId) {
+        return res.status(403).json({ success: false, error: 'This student is not assigned to you' });
+      }
     }
 
     res.json({
@@ -591,7 +601,7 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
 
     const Batch = (await import('../models/Batch')).default;
     let currentBatch = student.currentBatchId
-      ? await Batch.findById(student.currentBatchId)
+      ? await Batch.findOne({ _id: student.currentBatchId, status: { $in: ['upcoming', 'ongoing'] } })
           .select('name courseLevel status schedule timezone coach totalSessions sessionsCompleted whatsappCommunityLink classStartTime classDurationMinutes accessOpensMinutesBefore meetingLink')
           .populate('coach', 'name')
       : null;
@@ -615,14 +625,17 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
     // Get upcoming classes
     const Class = (await import('../models/Class')).default;
     const today = localCalendarDateAsUtc(student.timezone);
-    const upcomingClasses = await Class.find({
+    const upcomingClassCandidates = await Class.find({
       students: studentProfileId,
       status: 'scheduled',
       date: { $gte: today },
     })
       .populate('coach', 'name email')
       .sort({ date: 1, startTime: 1 })
-      .limit(5);
+      .limit(20);
+    const upcomingClasses = upcomingClassCandidates
+      .filter((classItem: any) => classWindow(classItem).endAt > new Date())
+      .slice(0, 5);
 
     // Get latest published evaluation report
     const EvaluationReport = (await import('../models/EvaluationReport')).default;
@@ -746,7 +759,10 @@ export const getStudentDashboard = async (req: ClientAuthRequest, res: Response)
           return {
             _id: classItem._id.toString(),
             course: classItem.course,
-            classType: classItem.classType,
+            // Trial is the only pre-enrollment workflow. Normalize legacy
+            // records that were stored as "demo" before the terminology was
+            // unified so the student portal never shows two concepts.
+            classType: classItem.classType === 'demo' ? 'trial' : classItem.classType,
             date: classItem.date,
             startTime: classItem.startTime,
             endTime: classItem.endTime,

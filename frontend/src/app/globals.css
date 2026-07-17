@@ -93,6 +93,33 @@ body {
   border-radius: 20px;
   background: var(--color-paper);
   box-shadow: var(--shadow-card);
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 640px) {
+  .admin-table-shell {
+    border-radius: 16px;
+  }
+  
+  .admin-table th {
+    padding: 0.75rem 1rem;
+    font-size: 0.64rem;
+  }
+  
+  .admin-table td {
+    padding: 0.875rem 1rem;
+    font-size: 0.8125rem;
+  }
+  
+  .admin-toolbar {
+    padding: 0.625rem;
+    border-radius: 14px;
+  }
+  
+  .admin-control {
+    height: 40px;
+    font-size: 0.8125rem;
+  }
 }
 
 .admin-table {
@@ -145,9 +172,26 @@ body {
 }
 
 .admin-empty {
-  padding: 3rem 1rem;
+  padding: 4rem 2rem;
   text-align: center;
   color: var(--color-muted);
+}
+
+.admin-empty::before {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1.5rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(199, 93, 60, 0.1), rgba(224, 163, 61, 0.1));
+  border: 2px dashed rgba(117, 106, 93, 0.3);
+}
+
+.admin-empty p {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
 }
 
 .admin-icon-button {

@@ -1,8 +1,10 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import Class, { ClassStatus } from '../models/Class';
-import Batch from '../models/Batch';
+import Batch, { BatchStatus } from '../models/Batch';
 import AcademyEvent, { AcademyEventStatus, AcademyEventType } from '../models/AcademyEvent';
+import Lead from '../models/Lead';
+import Student from '../models/Student';
 import { effectiveEventStatus } from '../services/academyEventService';
 import { sanitizeQueryParam } from '../utils/validation';
 
@@ -43,17 +45,49 @@ export const getCoachReports = async (req: AuthRequest, res: Response) => {
       ...(timezone ? { timezone } : {}),
     };
 
-    const [totalClassesConducted, totalDemoClasses, totalTrialClasses, totalCoverUpClasses, classRecords, batchRecords, eventRecords] = await Promise.all([
-      Class.countDocuments({ ...classFilter, status: ClassStatus.COMPLETED }),
-      Class.countDocuments({ ...classFilter, classType: 'demo', status: ClassStatus.COMPLETED }),
-      Class.countDocuments({ ...classFilter, classType: 'trial', status: ClassStatus.COMPLETED }),
-      Class.countDocuments({ ...classFilter, classType: 'extra', status: ClassStatus.COMPLETED }),
-      Class.find({ ...classFilter, classType: 'trial' })
+    // Class records do not store a country directly. Resolve the selected
+    // country once so the summary counts, trial table, and cover-up
+    // report all honour the same scope instead of silently showing all
+    // countries while only the event table is filtered.
+    const countryClassFilter: Record<string, any> = {};
+    let countryStudentIds: unknown[] = [];
+    if (country) {
+      const [countryStudents, countryLeads] = await Promise.all([
+        Student.find({ country }).select('_id').lean(),
+        Lead.find({ country }).select('_id').lean(),
+      ]);
+      countryStudentIds = countryStudents.map((item) => item._id);
+      countryClassFilter.$or = [
+        { students: { $in: countryStudentIds } },
+        { leadId: { $in: countryLeads.map((item) => item._id) } },
+      ];
+    }
+    const scopedClassFilter = { ...classFilter, ...countryClassFilter };
+    const batchQueryFilter: Record<string, any> = {
+      ...(coach ? { coach } : {}),
+      ...(country ? { students: { $in: countryStudentIds } } : {}),
+    };
+    const completedBatchFilter = {
+      ...batchQueryFilter,
+      status: BatchStatus.COMPLETED,
+      ...(dateRange ? { completedAt: dateRange } : {}),
+    };
+
+    const [totalRegularClassesConducted, totalTrialClasses, totalCoverUpClasses, totalCompletedBatches, trialRecords, batchRecords, eventRecords] = await Promise.all([
+      // “Classes conducted” means recurring batch sessions. Trial (including
+      // legacy records once labelled demo), extra/cover-up, and masterclass
+      // activity are intentionally reported as separate operational categories.
+      Class.countDocuments({ ...scopedClassFilter, classType: 'regular', status: ClassStatus.COMPLETED }),
+      Class.countDocuments({ ...scopedClassFilter, classType: { $in: ['trial', 'demo'] }, status: ClassStatus.COMPLETED }),
+      Class.countDocuments({ ...scopedClassFilter, classType: 'extra', status: ClassStatus.COMPLETED }),
+      Batch.countDocuments(completedBatchFilter),
+      Class.find({ ...scopedClassFilter, classType: { $in: ['trial', 'demo'] } })
         .populate('leadId', 'studentName country convertedToStudent status')
+        .populate('students', 'studentName country')
         .sort({ date: -1, startTime: -1 })
         .limit(200)
         .lean(),
-      Batch.find(coach ? { coach } : {})
+      Batch.find(batchQueryFilter)
         .populate('coach', 'name email')
         .select('name schedule timezone courseLevel status sessions totalSessions sessionsCompleted startDate completedAt coach')
         .sort({ createdAt: -1 })
@@ -72,19 +106,22 @@ export const getCoachReports = async (req: AuthRequest, res: Response) => {
         .lean(),
     ]);
 
-    const trialReport = classRecords
-      .filter((item: any) => !country || item.leadId?.country === country)
-      .map((item: any) => ({
+    const trialReport = trialRecords.map((item: any) => {
+      const lead = item.leadId;
+      const student = Array.isArray(item.students) ? item.students[0] : undefined;
+      return {
         _id: item._id.toString(),
-        studentName: item.leadId?.studentName || 'Unknown student',
-        country: item.leadId?.country,
+        studentName: lead?.studentName || student?.studentName || 'Unknown student',
+        country: lead?.country || student?.country,
         timezone: item.timezone,
         trialDate: item.date,
         startTime: item.startTime,
         endTime: item.endTime,
+        status: item.status,
         trialStatus: item.trialResult || item.status,
-        enrollmentStatus: item.leadId?.convertedToStudent ? 'enrolled' : 'pending',
-      }));
+        enrollmentStatus: lead?.convertedToStudent ? 'enrolled' : lead ? 'pending' : '—',
+      };
+    });
 
     const batchIds = batchRecords.map((batch: any) => batch._id);
     const batchClasses = batchIds.length && dailyRange
@@ -148,7 +185,7 @@ export const getCoachReports = async (req: AuthRequest, res: Response) => {
       }));
 
     const coverUpClasses = await Class.find({
-      ...classFilter,
+      ...scopedClassFilter,
       classType: 'extra',
     })
       .populate('batch', 'name')
@@ -170,11 +207,11 @@ export const getCoachReports = async (req: AuthRequest, res: Response) => {
       success: true,
       data: {
         summary: {
-          totalClassesConducted,
-          totalDemoClasses,
+          totalRegularClassesConducted,
           totalTrialClasses,
           totalMasterclassesConducted: masterclassReport.filter((event) => event.status === AcademyEventStatus.COMPLETED).length,
           totalCoverUpClasses,
+          totalCompletedBatches,
         },
         studentTrialReport: trialReport,
         batchReport,

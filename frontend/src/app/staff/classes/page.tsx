@@ -1,10 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Loader2, Search, Calendar, Clock, CheckCircle, Video, MessageCircle } from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Calendar, CheckCircle, Clock, Loader2, MessageCircle, RefreshCw, Search, Video } from "lucide-react";
 import PageHeader from "@/components/admin/PageHeader";
 import StatusBadge from "@/components/admin/StatusBadge";
+import { secondaryButtonClass } from "@/components/admin/FormField";
 import { getClasses, type ClassItem } from "@/lib/adminApi";
+
+function localDateValue() {
+  const value = new Date();
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 function getBatchName(batch: ClassItem["batch"]) {
   if (!batch) return "Individual";
@@ -19,13 +28,70 @@ function getClassDuration(startTime: string, endTime: string) {
   return normalized > 0 ? `${normalized} min` : "—";
 }
 
-function StartClassButton({ cls, now }: { cls: ClassItem; now: Date }) {
-  if (!cls.accessOpensAt || !cls.accessClosesAt || !cls.meetingLink || cls.status !== "scheduled") return null;
-  if (now < new Date(cls.accessOpensAt) || now > new Date(cls.accessClosesAt)) return null;
+function formatClassDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(value));
+}
+
+function formatBoundary(value: string, timezone?: string) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: timezone || undefined,
+    }).format(new Date(value));
+  } catch {
+    return new Date(value).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+}
+
+function LiveAccess({ cls, now }: { cls: ClassItem; now: Date }) {
+  const whatsappLink = typeof cls.batch === "object" ? cls.batch?.whatsappCommunityLink : undefined;
+  let accessState: ReactNode;
+
+  if (cls.status === "completed") {
+    accessState = <span className="text-xs font-semibold text-[var(--color-pine-deep)]">Completed</span>;
+  } else if (cls.status !== "scheduled") {
+    accessState = <span className="text-xs font-semibold text-[var(--color-muted)]">{cls.status === "cancelled" ? "Cancelled" : "Unavailable"}</span>;
+  } else if (!cls.meetingLink) {
+    accessState = <span className="text-xs font-semibold text-[var(--color-muted)]">Meeting link unavailable</span>;
+  } else if (cls.accessOpensAt && now < new Date(cls.accessOpensAt)) {
+    accessState = <span className="text-xs font-semibold text-[var(--color-muted)]">Opens {formatBoundary(cls.accessOpensAt, cls.timezone)}</span>;
+  } else if (cls.accessClosesAt && now > new Date(cls.accessClosesAt)) {
+    accessState = <span className="text-xs font-semibold text-[var(--color-muted)]">Access closed</span>;
+  } else {
+    accessState = (
+      <a
+        href={cls.meetingLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-ember)] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[var(--color-ember-deep)]"
+      >
+        <Video className="h-3.5 w-3.5" /> Start Now
+      </a>
+    );
+  }
+
   return (
-    <a href={cls.meetingLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-ember)] px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
-      <Video className="h-3.5 w-3.5" /> Start Now
-    </a>
+    <div className="flex flex-wrap items-center gap-2">
+      {accessState}
+      {whatsappLink && (
+        <a
+          href={whatsappLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open WhatsApp group"
+          aria-label={`Open WhatsApp group for ${getBatchName(cls.batch)}`}
+          className="rounded-lg border border-[var(--color-line)] p-2 text-[var(--color-pine-deep)] transition hover:bg-[var(--color-ivory)]"
+        >
+          <MessageCircle className="h-4 w-4" />
+        </a>
+      )}
+    </div>
   );
 }
 
@@ -34,18 +100,23 @@ export default function StaffClassesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(localDateValue);
   const [now, setNow] = useState(() => new Date());
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
-      const data = await getClasses({ classType: "regular", dateFrom: selectedDate, dateTo: selectedDate, limit: 100 });
-      if (data.success) {
-        setClasses(data.data || []);
-      } else {
-        setError(data.error || "Failed to load classes");
+      const params = { dateFrom: selectedDate, dateTo: selectedDate, limit: 100 };
+      const [regularResponse, extraResponse] = await Promise.all([
+        getClasses({ ...params, classType: "regular" }),
+        getClasses({ ...params, classType: "extra" }),
+      ]);
+      if (!regularResponse.success || !extraResponse.success) {
+        setError(regularResponse.error || extraResponse.error || "Failed to load classes");
+        return;
       }
+      setClasses([...(regularResponse.data || []), ...(extraResponse.data || [])].sort((left, right) => `${left.date}${left.startTime}`.localeCompare(`${right.date}${right.startTime}`)));
     } catch {
       setError("Could not connect to the server.");
     } finally {
@@ -76,102 +147,112 @@ export default function StaffClassesPage() {
     return () => { if (timer) window.clearTimeout(timer); };
   }, [classes]);
 
-  const filteredClasses = classes.filter(
-    (cls) =>
-      cls.course.toLowerCase().includes(search.toLowerCase()) ||
-      getBatchName(cls.batch).toLowerCase().includes(search.toLowerCase())
+  const query = search.trim().toLowerCase();
+  const filteredClasses = classes.filter((cls) =>
+    !query || cls.course.toLowerCase().includes(query) || getBatchName(cls.batch).toLowerCase().includes(query)
   );
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" />
-      </div>
-    );
-  }
+  const scheduledCount = classes.filter((cls) => cls.status === "scheduled").length;
+  const completedCount = classes.filter((cls) => cls.status === "completed").length;
 
   return (
     <div>
-      <PageHeader
-        title="Classes"
-        description="View regular classes scheduled for one day"
-      />
+      <PageHeader title="Classes" description="Your regular and cover-up classes for the selected day, with live access timing." />
 
       {error && (
-        <div className="admin-alert admin-alert-error">
-          {error}
+        <div role="alert" className="admin-alert admin-alert-error flex flex-wrap items-center justify-between gap-3">
+          <span>{error}</span>
+          <button type="button" onClick={() => void load()} disabled={loading} className={secondaryButtonClass}>
+            <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} /> Try again
+          </button>
         </div>
       )}
 
-      <div className="admin-toolbar">
-        <label className="text-xs font-semibold text-[var(--color-muted)]">Classes for<input type="date" className="admin-control mt-1" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} /></label>
-        <div className="relative flex-1">
+      <div className="admin-toolbar items-end">
+        <label className="min-w-[170px] text-xs font-semibold text-[var(--color-muted)]">
+          Class date
+          <input type="date" className="admin-control mt-1" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
+        </label>
+        <label className="relative min-w-[220px] flex-1">
+          <span className="sr-only">Search classes</span>
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]" />
-          <input
-            type="text"
-            placeholder="Search classes..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="admin-control admin-control-search"
-          />
+          <input type="search" placeholder="Search topic or batch" value={search} onChange={(event) => setSearch(event.target.value)} className="admin-control admin-control-search" />
+        </label>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-muted)]">
+          <span><strong className="text-[var(--color-walnut)]">{filteredClasses.length}</strong> shown</span>
+          <span><strong className="text-[var(--color-walnut)]">{scheduledCount}</strong> scheduled</span>
+          <span><strong className="text-[var(--color-walnut)]">{completedCount}</strong> completed</span>
         </div>
+        <button type="button" onClick={() => void load()} disabled={loading} className={secondaryButtonClass}>
+          <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} /> Refresh
+        </button>
       </div>
 
-      <div className="admin-table-shell">
-        <table className="admin-table min-w-[800px]">
-          <thead>
-            <tr>
-              <th className="text-left">Topic</th>
-              <th className="text-left">Batch</th>
-              <th className="text-left">Date & Time</th>
-              <th className="text-left">Duration</th>
-              <th className="text-left">Status</th>
-              <th className="text-left">Live Access</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredClasses.map((cls) => (
-              <tr key={cls._id}>
-                <td className="whitespace-nowrap admin-primary-cell">{cls.course}</td>
-                <td className="whitespace-nowrap">{getBatchName(cls.batch)}</td>
-                <td className="whitespace-nowrap">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="h-4 w-4" />
-                    {new Date(cls.date).toLocaleDateString(undefined, { timeZone: "UTC" })}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm mt-1">
-                    <Clock className="h-4 w-4" />
-                    {cls.startTime}–{cls.endTime} {cls.timezone}
-                  </div>
-                  {cls.classType === "extra" && cls.extraClassReason && (
-                    <p className="mt-1 max-w-xs whitespace-normal text-xs text-[var(--color-muted)]">{cls.extraClassReason}</p>
-                  )}
-                </td>
-                <td className="whitespace-nowrap">{getClassDuration(cls.startTime, cls.endTime)}</td>
-                <td className="whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    {cls.status === "completed" && <CheckCircle className="h-4 w-4 text-[var(--color-pine)]" />}
-                    <StatusBadge status={cls.status} />
-                  </div>
-                </td>
-                <td className="whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    <StartClassButton cls={cls} now={now} />
-                    {typeof cls.batch === "object" && cls.batch?.whatsappCommunityLink && (
-                      <a href={cls.batch.whatsappCommunityLink} target="_blank" rel="noreferrer" title="Open WhatsApp group" className="rounded-lg border border-[var(--color-line)] p-2 text-[var(--color-pine-deep)] hover:bg-[var(--color-ivory)]">
-                        <MessageCircle className="h-4 w-4" />
-                      </a>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filteredClasses.length === 0 && (
-          <div className="admin-empty">No regular classes are scheduled for this day.</div>
-        )}
-      </div>
+      {loading && classes.length === 0 ? (
+        <div className="admin-table-shell flex min-h-48 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--color-ember)]" aria-label="Loading classes" />
+        </div>
+      ) : (
+        <div className="admin-table-shell">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-line)] px-5 py-3">
+            <p className="text-sm font-bold text-[var(--color-walnut)]">Daily class schedule</p>
+            {loading && <span className="text-xs font-semibold text-[var(--color-ember)]">Refreshing…</span>}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="admin-table min-w-[1000px]">
+              <caption className="sr-only">Regular and cover-up classes for {selectedDate}</caption>
+              <thead>
+                <tr>
+                  <th className="text-left">Topic</th>
+                  <th className="text-left">Batch</th>
+                  <th className="text-left">Type</th>
+                  <th className="text-left">Date & time</th>
+                  <th className="text-left">Duration</th>
+                  <th className="text-left">Status</th>
+                  <th className="text-left">Live access</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClasses.map((cls) => (
+                  <tr key={cls._id}>
+                    <td className="whitespace-nowrap admin-primary-cell">{cls.course}</td>
+                    <td className="whitespace-nowrap">{getBatchName(cls.batch)}</td>
+                    <td className="whitespace-nowrap">
+                      <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${cls.classType === "extra" ? "border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]" : "border-[rgba(63,107,92,0.22)] bg-[var(--color-pine)]/10 text-[var(--color-pine-deep)]"}`}>
+                        {cls.classType === "extra" ? "Cover-up" : "Regular"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="h-4 w-4 text-[var(--color-muted)]" />
+                        {formatClassDate(cls.date)}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-sm">
+                        <Clock className="h-4 w-4 text-[var(--color-muted)]" />
+                        {cls.startTime}–{cls.endTime}
+                        <span className="text-xs text-[var(--color-muted)]">{cls.timezone}</span>
+                      </div>
+                      {cls.classType === "extra" && cls.extraClassReason && <p className="mt-1 max-w-xs whitespace-normal text-xs text-[var(--color-muted)]">{cls.extraClassReason}</p>}
+                    </td>
+                    <td className="whitespace-nowrap">{getClassDuration(cls.startTime, cls.endTime)}</td>
+                    <td className="whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        {cls.status === "completed" && <CheckCircle className="h-4 w-4 text-[var(--color-pine)]" />}
+                        <StatusBadge status={cls.status} />
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap"><LiveAccess cls={cls} now={now} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {filteredClasses.length === 0 && (
+            <div className="admin-empty">
+              {query ? `No classes match “${search.trim()}”.` : "No regular or cover-up classes are scheduled for this day."}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

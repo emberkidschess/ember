@@ -114,9 +114,9 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response) => {
       Inquiry.countDocuments({
         createdAt: { $gte: today },
       }),
-      Class.countDocuments({ classType: 'trial' }),
+      Class.countDocuments({ classType: { $in: ['trial', 'demo'] } }),
       Class.countDocuments({
-        classType: 'trial',
+        classType: { $in: ['trial', 'demo'] },
         createdAt: { $gte: today },
       }),
       Package.countDocuments(),

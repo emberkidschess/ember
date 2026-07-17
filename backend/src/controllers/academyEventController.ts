@@ -13,6 +13,7 @@ import {
   createAcademyEvent,
   dateOnly,
   effectiveEventStatus,
+  completeEndedAcademyEvents,
   eventWindow,
   getStudentEventView,
   isEventJoinOpen,
@@ -61,6 +62,7 @@ function assertFutureEvent(date: string, startTime: string, timezone: string) {
 
 export const getAcademyEvents = async (req: AuthRequest, res: Response) => {
   try {
+    await completeEndedAcademyEvents();
     const type = parseEventType(req.params.type);
     const { country, timezone, coach, level, date, status, page = '1', limit = '100' } = req.query;
     const filter: any = { type };

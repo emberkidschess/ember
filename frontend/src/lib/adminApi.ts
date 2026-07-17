@@ -120,11 +120,11 @@ export const cancelAcademyEvent = (type: AcademyEventType, id: string) =>
 
 export interface CoachReports {
   summary: {
-    totalClassesConducted: number;
-    totalDemoClasses: number;
+    totalRegularClassesConducted: number;
     totalTrialClasses: number;
     totalMasterclassesConducted: number;
     totalCoverUpClasses: number;
+    totalCompletedBatches: number;
   };
   studentTrialReport: Record<string, unknown>[];
   batchReport: Record<string, unknown>[];
@@ -271,7 +271,7 @@ export interface StaffMember {
 export const getStaffList = (role?: "coach" | "staff") =>
   adminFetchJSON<ApiListResponse<StaffMember>>(`/staff${role ? `?role=${role}` : ""}`);
 export const getStaffMember = (id: string) => adminFetchJSON<ApiItemResponse<StaffMember>>(`/staff/${id}`);
-export const createStaffMember = (payload: { name: string; email: string; role: string; expertise?: string[]; permissions?: string[]; salaryPerClass?: number; defaultClassLink: string }) =>
+export const createStaffMember = (payload: { name: string; email: string; role: string; expertise?: string[]; permissions?: string[]; salaryPerClass?: number; defaultClassLink?: string }) =>
   adminFetchJSON<ApiItemResponse<StaffMember & { tempPassword?: string }>>("/staff", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -379,7 +379,7 @@ export interface Batch {
   nextUpcomingClass?: {
     _id: string;
     course: string;
-    classType: "regular" | "master" | "extra" | "trial" | "demo";
+    classType: "regular" | "master" | "extra" | "trial";
     date: string;
     startTime: string;
     endTime: string;
@@ -456,7 +456,7 @@ export interface ClassItem {
   endTime: string;
   timezone: string;
   meetingLink?: string;
-  classType: "regular" | "master" | "extra" | "trial" | "demo";
+  classType: "regular" | "master" | "extra" | "trial";
   status: string;
   notes?: string;
   extraClassReason?: string;

@@ -6,8 +6,10 @@ let scheduledTasks: ScheduledTask[] = [];
 async function runMarkAbsentees(): Promise<void> {
   try {
     const { startEligibleAutomatedBatches } = await import('../services/batchSchedulingService');
+    const { completeEndedAcademyEvents } = await import('../services/academyEventService');
     const { markAbsentees } = await import('../scripts/markAbsentees');
     await startEligibleAutomatedBatches();
+    await completeEndedAcademyEvents();
     await markAbsentees();
   } catch (error) {
     logger.error('markAbsentees scheduler error:', error);

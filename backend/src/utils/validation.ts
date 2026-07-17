@@ -138,17 +138,27 @@ export const updateStudentSchema = createStudentSchema.partial();
 
 // ---- Staff ----
 
-export const createStaffSchema = z.object({
+const staffPayloadSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   role: z.enum(['coach', 'staff']),
   expertise: z.array(z.string()).optional(),
   permissions: z.array(z.enum(STAFF_PERMISSIONS)).optional(),
   salaryPerClass: z.number().optional(),
-  defaultClassLink: z.url().refine((value) => /^https?:\/\//i.test(value), 'Default class link must use HTTP or HTTPS'),
+  defaultClassLink: z.url().refine((value) => /^https?:\/\//i.test(value), 'Default class link must use HTTP or HTTPS').optional(),
 });
 
-export const updateStaffSchema = createStaffSchema.partial();
+export const createStaffSchema = staffPayloadSchema.refine(
+  (value) => value.role !== 'coach' || Boolean(value.defaultClassLink),
+  { path: ['defaultClassLink'], message: 'An active coach needs a default class link' }
+);
+
+// Updates may omit the existing link; if a role/link is explicitly changed,
+// a coach still cannot be left without a usable meeting URL.
+export const updateStaffSchema = staffPayloadSchema.partial().refine(
+  (value) => value.role !== 'coach' || value.defaultClassLink === undefined || Boolean(value.defaultClassLink),
+  { path: ['defaultClassLink'], message: 'An active coach needs a default class link' }
+);
 
 // ---- Classes ----
 
@@ -162,7 +172,10 @@ export const createClassSchema = z.object({
   endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   timezone: z.enum(SUPPORTED_TIMEZONES).optional(),
   meetingLink: z.url().optional().or(z.literal('')),
-  classType: z.enum(['regular', 'master', 'extra', 'trial', 'demo']).optional(),
+  // Trial is the only pre-enrollment class workflow. Legacy records that
+  // used the old "demo" value are read as trial by the class/report APIs,
+  // but new writes must use "trial".
+  classType: z.enum(['regular', 'master', 'extra', 'trial']).optional(),
   accessOpensMinutesBefore: z.number().int().min(5).max(10).optional(),
   extraClassReason: z.string().trim().max(1000).optional(),
   notes: z.string().optional(),

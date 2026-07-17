@@ -16,6 +16,18 @@ import '../models/Batch';
 import '../models/ClientAuth';
 import '../models/AuditLog';
 import '../models/Attendance';
+import '../models/Notification';
+import '../models/DeliveryLog';
+import '../models/AcademyEvent';
+import '../models/EvaluationReport';
+import '../models/Inquiry';
+import '../models/Testimonial';
+import '../models/Course';
+import '../models/Prodigy';
+import '../models/Roadmap';
+import '../models/SiteConfig';
+import '../models/RefreshToken';
+import '../models/Counter';
 
 const Admin = mongoose.model('Admin');
 const Staff = mongoose.model('Staff');
@@ -29,6 +41,18 @@ const Batch = mongoose.model('Batch');
 const ClientAuth = mongoose.model('ClientAuth');
 const AuditLog = mongoose.model('AuditLog');
 const Attendance = mongoose.model('Attendance');
+const Notification = mongoose.model('Notification');
+const DeliveryLog = mongoose.model('DeliveryLog');
+const AcademyEvent = mongoose.model('AcademyEvent');
+const EvaluationReport = mongoose.model('EvaluationReport');
+const Inquiry = mongoose.model('Inquiry');
+const Testimonial = mongoose.model('Testimonial');
+const Course = mongoose.model('Course');
+const Prodigy = mongoose.model('Prodigy');
+const Roadmap = mongoose.model('Roadmap');
+const SiteConfig = mongoose.model('SiteConfig');
+const RefreshToken = mongoose.model('RefreshToken');
+const Counter = mongoose.model('Counter');
 
 async function cleanupDatabase() {
   try {
@@ -37,10 +61,14 @@ async function cleanupDatabase() {
 
     console.log('\n=== DATABASE CLEANUP STARTED ===\n');
 
-    // Delete collections (keeping Admin and Staff)
+    // Delete all collections (keeping Admin only)
     console.log('Deleting Students...');
     await Student.deleteMany({});
     console.log('✓ Students deleted');
+
+    console.log('Deleting Staff...');
+    await Staff.deleteMany({});
+    console.log('✓ Staff deleted');
 
     console.log('Deleting Leads...');
     await Lead.deleteMany({});
@@ -78,13 +106,59 @@ async function cleanupDatabase() {
     await Attendance.deleteMany({});
     console.log('✓ Attendance Records deleted');
 
+    console.log('Deleting Notifications...');
+    await Notification.deleteMany({});
+    console.log('✓ Notifications deleted');
+
+    console.log('Deleting Delivery Logs...');
+    await DeliveryLog.deleteMany({});
+    console.log('✓ Delivery Logs deleted');
+
+    console.log('Deleting Academy Events...');
+    await AcademyEvent.deleteMany({});
+    console.log('✓ Academy Events deleted');
+
+    console.log('Deleting Evaluation Reports...');
+    await EvaluationReport.deleteMany({});
+    console.log('✓ Evaluation Reports deleted');
+
+    console.log('Deleting Inquiries...');
+    await Inquiry.deleteMany({});
+    console.log('✓ Inquiries deleted');
+
+    console.log('Deleting Testimonials...');
+    await Testimonial.deleteMany({});
+    console.log('✓ Testimonials deleted');
+
+    console.log('Deleting Courses...');
+    await Course.deleteMany({});
+    console.log('✓ Courses deleted');
+
+    console.log('Deleting Prodigy Games...');
+    await Prodigy.deleteMany({});
+    console.log('✓ Prodigy Games deleted');
+
+    console.log('Deleting Roadmaps...');
+    await Roadmap.deleteMany({});
+    console.log('✓ Roadmaps deleted');
+
+    console.log('Deleting Site Config...');
+    await SiteConfig.deleteMany({});
+    console.log('✓ Site Config deleted');
+
+    console.log('Deleting Refresh Tokens...');
+    await RefreshToken.deleteMany({});
+    console.log('✓ Refresh Tokens deleted');
+
+    console.log('Deleting Counters...');
+    await Counter.deleteMany({});
+    console.log('✓ Counters deleted');
+
     // Count preserved records
     const adminCount = await Admin.countDocuments();
-    const staffCount = await Staff.countDocuments();
 
     console.log('\n=== CLEANUP COMPLETED ===\n');
     console.log(`Preserved Admin accounts: ${adminCount}`);
-    console.log(`Preserved Staff accounts: ${staffCount}`);
     console.log('\nAll other data has been deleted.\n');
 
   } catch (error) {

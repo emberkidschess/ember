@@ -32,6 +32,17 @@ function sendPackageError(res: Response, error: unknown, fallback: string) {
   });
 }
 
+async function coachStudentIds(req: AuthRequest): Promise<string[] | null> {
+  if (req.user?.role !== 'coach') return null;
+  const ids = await Student.find({ assignedStaff: req.user.userId }).distinct('_id');
+  return ids.map((id) => id.toString());
+}
+
+async function coachCanAccessStudent(req: AuthRequest, studentId: unknown): Promise<boolean> {
+  if (req.user?.role !== 'coach') return true;
+  return Boolean(await Student.exists({ _id: studentId, assignedStaff: req.user.userId }));
+}
+
 async function linkActivePackageToStudent(
   studentId: mongoose.Types.ObjectId | string,
   packageId: mongoose.Types.ObjectId | string,
@@ -88,7 +99,14 @@ export const getPackages = async (req: AuthRequest, res: Response) => {
     const sanitizedStudent = sanitizeQueryParam(student);
     const sanitizedStatus = sanitizeQueryParam(status);
     const sanitizedCourseLevel = sanitizeQueryParam(courseLevel);
-    if (sanitizedStudent) filter.student = sanitizedStudent;
+    const scopedStudentIds = await coachStudentIds(req);
+    if (scopedStudentIds) {
+      filter.student = sanitizedStudent
+        ? { $in: scopedStudentIds.filter((id) => id === sanitizedStudent) }
+        : { $in: scopedStudentIds };
+    } else if (sanitizedStudent) {
+      filter.student = sanitizedStudent;
+    }
     if (sanitizedStatus) filter.status = sanitizedStatus;
     if (sanitizedCourseLevel) filter.courseLevel = sanitizedCourseLevel;
 
@@ -139,6 +157,9 @@ export const getPackageById = async (req: AuthRequest, res: Response) => {
         success: false,
         error: 'Package not found',
       });
+    }
+    if (!(await coachCanAccessStudent(req, packageData.student))) {
+      return res.status(404).json({ success: false, error: 'Package not found' });
     }
 
     res.json({
@@ -636,6 +657,10 @@ export const upgradePackage = async (req: AuthRequest, res: Response) => {
 export const getStudentPackages = async (req: AuthRequest, res: Response) => {
   try {
     const { studentId } = req.params;
+
+    if (!(await coachCanAccessStudent(req, studentId))) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
 
     const packages = await Package.find({ student: studentId })
       .populate('previousPackageId', 'packageType courseLevel status')

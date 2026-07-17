@@ -238,7 +238,7 @@ export default function LeadsPage() {
                     </div>
                     <div className="mt-1 flex items-center gap-2 text-sm">
                       <Phone className="h-4 w-4" />
-                      {lead.phoneNumber}
+                      {lead.phoneNumber || "—"}
                     </div>
                   </td>
                   <td className="whitespace-nowrap">{toTitleLabel(lead.courseInterest)}</td>
@@ -305,14 +305,14 @@ export default function LeadsPage() {
             >
               {COUNTRY_OPTIONS.map((opt) => (
                 <option key={opt.code} value={opt.code}>
-                  {opt.label}
+                  {opt.flag} {opt.dialCode}
                 </option>
               ))}
             </select>
             <input
               type="tel"
               value={form.phoneNumber}
-              onChange={(e) => setForm({ ...form, phoneNumber: formatPhoneInput(e.target.value) })}
+              onChange={(e) => setForm({ ...form, phoneNumber: formatPhoneInput(e.target.value, form.country) })}
               className={inputClass}
               placeholder="Enter phone number"
             />

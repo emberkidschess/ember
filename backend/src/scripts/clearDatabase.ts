@@ -31,8 +31,8 @@ dotenv.config();
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/emberkids';
 
 /**
- * Clears all documents from all collections.
- * WARNING: This will delete ALL data from the database.
+ * Clears all documents from all collections EXCEPT admin credentials.
+ * WARNING: This will delete ALL data except Admin and AdminAuth collections.
  */
 const clearDatabase = async () => {
   try {
@@ -45,13 +45,18 @@ const clearDatabase = async () => {
     }
 
     const collections = await db.listCollections().toArray();
+    const collectionsToSkip = ['admins', 'adminauths'];
     
     for (const collection of collections) {
+      if (collectionsToSkip.includes(collection.name)) {
+        console.log(`Skipping ${collection.name} (admin credentials preserved)`);
+        continue;
+      }
       const result = await db.collection(collection.name).deleteMany({});
       console.log(`Cleared ${result.deletedCount} documents from ${collection.name}`);
     }
 
-    console.log('\nAll collections cleared successfully!');
+    console.log('\nAll collections cleared successfully (admin credentials preserved)!');
   } catch (error) {
     console.error('Error clearing database:', error);
     process.exit(1);
