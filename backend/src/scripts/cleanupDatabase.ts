@@ -6,6 +6,7 @@ dotenv.config();
 // Import all models to ensure they're registered
 import '../models/Admin';
 import '../models/Staff';
+import '../models/StaffAuth';
 import '../models/Student';
 import '../models/Lead';
 import '../models/Package';
@@ -31,6 +32,7 @@ import '../models/Counter';
 
 const Admin = mongoose.model('Admin');
 const Staff = mongoose.model('Staff');
+const StaffAuth = mongoose.model('StaffAuth');
 const Student = mongoose.model('Student');
 const Lead = mongoose.model('Lead');
 const Package = mongoose.model('Package');
@@ -69,6 +71,13 @@ async function cleanupDatabase() {
     console.log('Deleting Staff...');
     await Staff.deleteMany({});
     console.log('✓ Staff deleted');
+
+    // Staff profiles and their credentials must be cleared together.
+    // Leaving StaffAuth records behind makes a previously used email appear
+    // unavailable when a new staff member is created.
+    console.log('Deleting Staff Auth...');
+    await StaffAuth.deleteMany({});
+    console.log('✓ Staff Auth deleted');
 
     console.log('Deleting Leads...');
     await Lead.deleteMany({});

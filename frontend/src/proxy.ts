@@ -3,6 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 const PORTAL_COOKIE_NAME = "ek_internal_portal";
 const PORTAL_TTL_SECONDS = 12 * 60 * 60;
 const PORTAL_TTL_MS = PORTAL_TTL_SECONDS * 1000;
+const PUBLIC_RECOVERY_PATHS = new Set([
+  "/admin/forgot-password",
+  "/admin/reset-password",
+  "/staff/forgot-password",
+  "/staff/reset-password",
+]);
 
 function getConfiguredEntryPath(): string | null {
   const rawPath = process.env.INTERNAL_PORTAL_ENTRY_PATH?.trim();
@@ -14,6 +20,13 @@ function getConfiguredEntryPath(): string | null {
 }
 
 function isInternalRoute(pathname: string): boolean {
+  // Reset links are intentionally public: they are protected by a
+  // single-use, time-limited token that the API validates. Requiring the
+  // private portal-entry cookie here makes a reset link from email unusable.
+  if (PUBLIC_RECOVERY_PATHS.has(pathname)) {
+    return false;
+  }
+
   return (
     pathname === "/login" ||
     pathname === "/admin" ||

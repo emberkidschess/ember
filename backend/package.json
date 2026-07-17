@@ -15,6 +15,7 @@
     "seed": "ts-node src/scripts/seed.ts",
     "init:collections": "ts-node src/scripts/initCollections.ts",
     "clear:database": "ts-node src/scripts/clearDatabase.ts",
+    "cleanup:student-orphans": "ts-node src/scripts/cleanupStudentOrphans.ts",
     "create:admin": "ts-node src/scripts/createAdmin.ts",
     "check:admin-users": "ts-node src/scripts/checkAdminUsers.ts",
     "unlock:admin": "ts-node src/scripts/unlockAdmin.ts",
