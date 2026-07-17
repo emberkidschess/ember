@@ -103,7 +103,7 @@ export const createStaff = async (req: AuthRequest, res: Response) => {
     const ipAddress = req.ipAddress || 'unknown';
     const userAgent = req.userAgent || 'unknown';
 
-    const existingStaffAuth = await StaffAuth.findOne({ email });
+    const existingStaffAuth = await StaffAuth.findOne({ email: email.toLowerCase() });
     if (existingStaffAuth) {
       return res.status(400).json({
         success: false,
@@ -195,7 +195,7 @@ export const updateStaff = async (req: AuthRequest, res: Response) => {
     }
 
     if (email && email !== staff.email) {
-      const existingStaffAuth = await StaffAuth.findOne({ email });
+      const existingStaffAuth = await StaffAuth.findOne({ email: email.toLowerCase() });
       if (existingStaffAuth) {
         return res.status(400).json({
           success: false,
