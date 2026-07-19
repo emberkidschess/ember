@@ -17,7 +17,7 @@ import { ChatHistoryInput, streamAcademyChat } from "@/lib/chat";
 const STORAGE_KEY = "emberkids-academy-chat-v1";
 const WELCOME_ID = "emberkids-welcome";
 const MAX_STORED_MESSAGES = 30;
-const GREETING_PLAYED_KEY = "emberkids-amber-greeting-played-v2";
+const GREETING_PLAYED_KEY = "emberkids-amber-greeting-played-v3";
 const WELCOME_INTRO = "Hi! I’m Amber 👋";
 const WELCOME_BODY =
   "Welcome to EmberKids Academy! I'm here to help you with courses, fees, free demo classes, batch timings, admissions, and any other questions you may have.";
@@ -32,7 +32,6 @@ interface ChatMessage {
 
 interface AcademyChatbotProps {
   launcherVisible: boolean;
-  showLauncherMessage: boolean;
 }
 
 const welcomeMessage: ChatMessage = {
@@ -133,7 +132,6 @@ function TypingDots() {
 
 export default function AcademyChatbot({
   launcherVisible,
-  showLauncherMessage,
 }: AcademyChatbotProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -148,11 +146,11 @@ export default function AcademyChatbot({
   const greetingAudioRef = useRef<HTMLAudioElement>(null);
   const tapAudioContextRef = useRef<AudioContext | null>(null);
   const greetingPlayedRef = useRef(false);
-  const launcherMessageVisibleRef = useRef(showLauncherMessage && !isOpen);
+  const launcherMessageVisibleRef = useRef(!isOpen);
 
   useEffect(() => {
-    launcherMessageVisibleRef.current = showLauncherMessage && !isOpen;
-  }, [showLauncherMessage, isOpen]);
+    launcherMessageVisibleRef.current = !isOpen;
+  }, [isOpen]);
 
   const playGreetingSound = useCallback(() => {
     if (!launcherMessageVisibleRef.current || greetingPlayedRef.current) return;
@@ -226,7 +224,7 @@ export default function AcademyChatbot({
       oscillator.frequency.setValueAtTime(640, now);
       oscillator.frequency.exponentialRampToValueAtTime(900, now + 0.08);
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.035, now + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.022, now + 0.008);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
       oscillator.connect(gain);
       gain.connect(context.destination);
@@ -405,7 +403,7 @@ export default function AcademyChatbot({
     <>
       <audio
         ref={greetingAudioRef}
-        src="/sounds/amber-greeting-cute.wav"
+        src="/sounds/amber-greeting-final.wav"
         preload="auto"
         className="pointer-events-none absolute h-0 w-0 opacity-0"
         aria-hidden="true"
@@ -421,7 +419,7 @@ export default function AcademyChatbot({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.985 }}
             transition={{ type: "spring", stiffness: 360, damping: 32, mass: 0.7 }}
-            className="fixed bottom-[6.5rem] right-4 z-[140] flex h-[min(540px,calc(100dvh-8rem))] w-[calc(100vw-2rem)] max-w-[410px] min-h-0 flex-col overflow-hidden rounded-[24px] border border-[var(--color-line)] bg-[var(--color-paper)] shadow-[0_24px_70px_-30px_rgba(31,27,22,0.6)] sm:right-6 sm:h-[min(560px,calc(100dvh-8rem))] sm:w-[410px] sm:max-w-none"
+            className="fixed bottom-[11rem] right-4 z-[140] flex h-[min(500px,calc(100dvh-12rem))] w-[calc(100vw-2rem)] max-w-[410px] min-h-0 flex-col overflow-hidden rounded-[24px] border border-[var(--color-line)] bg-[var(--color-paper)] shadow-[0_24px_70px_-30px_rgba(31,27,22,0.6)] sm:right-6 sm:h-[min(540px,calc(100dvh-12rem))] sm:w-[410px] sm:max-w-none"
           >
             <header className="flex shrink-0 items-center gap-3 border-b border-[var(--color-line)] px-4 py-3.5 sm:px-5">
               <Image
@@ -539,21 +537,6 @@ export default function AcademyChatbot({
             exit={{ opacity: 0, y: 10 }}
             className="relative"
           >
-            <AnimatePresence>
-              {showLauncherMessage && !isOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                  transition={{ duration: 0.2 }}
-                  className="pointer-events-none absolute bottom-full left-1/2 mb-3 -translate-x-1/2 whitespace-nowrap rounded-2xl border border-[var(--color-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--color-walnut)] shadow-[0_12px_35px_-14px_rgba(31,27,22,0.5)]"
-                >
-                 hello !
-                  <span className="absolute -bottom-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b border-r border-[var(--color-line)] bg-white" />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
             <button
               type="button"
               onClick={() => setIsOpen((open) => !open)}
@@ -561,8 +544,16 @@ export default function AcademyChatbot({
               onPointerLeave={() => setIsMascotHovered(false)}
               onPointerDown={() => {
                 setIsMascotHovered(true);
-                playTapSound();
-                playGreetingSound();
+                const shouldPlayGreeting =
+                  launcherMessageVisibleRef.current && !greetingPlayedRef.current;
+                if (shouldPlayGreeting) {
+                  // Start the voice inside the user gesture, then add the soft chirp
+                  // just after it so the first syllable stays clear.
+                  playGreetingSound();
+                  window.setTimeout(playTapSound, 140);
+                } else {
+                  playTapSound();
+                }
               }}
               data-ember-launcher
               aria-label={isOpen ? "Close chat" : "Open EmberKids chat"}
