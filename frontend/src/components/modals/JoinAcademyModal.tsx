@@ -66,7 +66,7 @@ export default function JoinAcademyModal({ isOpen, onClose, onStartTrial }: Join
 
             <div className="px-7 sm:px-9 pt-9 pb-7">
               <h2 className="font-serif text-2xl sm:text-3xl text-black mb-2">
-                Join Ember<span className="text-[#f85b1c]">Kids</span>
+                Join <span className="text-[#f85b1c]">Ember</span><span className="text-black">Kids</span>
               </h2>
               <p className="text-sm text-gray-500 mb-7">
                 Here&apos;s how a child becomes a student at our academy.

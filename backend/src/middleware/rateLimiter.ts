@@ -5,6 +5,7 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_API_MAX = parseInt(process.env.RATE_LIMIT_API_MAX || '100', 10);
 const RATE_LIMIT_STRICT_MAX = parseInt(process.env.RATE_LIMIT_STRICT_MAX || '25', 10);
 const RATE_LIMIT_AUTH_MAX = parseInt(process.env.RATE_LIMIT_AUTH_MAX || '10', 10);
+const RATE_LIMIT_CHAT_MAX = parseInt(process.env.RATE_LIMIT_CHAT_MAX || '30', 10);
 
 export const apiLimiter = rateLimit({
   windowMs: RATE_LIMIT_WINDOW_MS,
@@ -33,6 +34,19 @@ export const authLimiter = rateLimit({
   windowMs: RATE_LIMIT_WINDOW_MS,
   max: RATE_LIMIT_AUTH_MAX,
   message: { success: false, error: 'Too many authentication attempts from this IP. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Public AI requests are comparatively expensive, so they have their own
+// budget without affecting ordinary public website API calls.
+export const chatLimiter = rateLimit({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_CHAT_MAX,
+  message: {
+    success: false,
+    error: 'You have sent several chat messages. Please wait a little and try again.',
+  },
   standardHeaders: true,
   legacyHeaders: false,
 });

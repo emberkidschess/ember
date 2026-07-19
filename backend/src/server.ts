@@ -18,6 +18,7 @@ import { requestIdMiddleware } from './middleware/requestId';
 import logger from './utils/logger';
 import { initializeSchedulers, stopSchedulers } from './utils/scheduler';
 import { BaseAuthService } from './services/baseAuthService';
+import { initializeKnowledgeBase } from './services/knowledgeBaseService';
 
 const app: Application = express();
 const PORT = process.env.PORT || 5001;
@@ -75,6 +76,7 @@ const startServer = async () => {
     await connectDB();
     await initializeRedis();
     initializeSchedulers();
+    initializeKnowledgeBase();
     
     process.on('unhandledRejection', (reason, promise) => {
       logger.error('Unhandled Rejection at:', promise, 'reason:', reason);

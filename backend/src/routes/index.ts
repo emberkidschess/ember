@@ -26,6 +26,7 @@ import packageRoutes from './packageRoutes';
 import evaluationReportRoutes from './evaluationReportRoutes';
 import academyEventRoutes from './academyEventRoutes';
 import reportRoutes from './reportRoutes';
+import chatRoutes from './chatRoutes';
 import { csrfProtection, validateCSRFToken } from '../middleware/csrf';
 
 const router = Router();
@@ -84,5 +85,6 @@ router.use('/prodigies', prodigyRoutes);
 router.use('/courses', courseRoutes);
 router.use('/inquiries', inquiryRoutes);
 router.use('/roadmap', roadmapRoutes);
+router.use('/chat', chatRoutes);
 
 export default router;

@@ -21,6 +21,7 @@
     "unlock:admin": "ts-node src/scripts/unlockAdmin.ts",
     "migrate:separate-auth": "ts-node src/scripts/migrateToSeparateAuth.ts",
     "fix:admin-passwords": "ts-node src/scripts/fixAdminPasswords.ts",
+    "rag:index": "ts-node src/scripts/reindexKnowledge.ts",
     "audit": "npm audit",
     "audit:fix": "npm audit fix",
     "audit:dev": "npm audit --audit-level=moderate"
@@ -37,6 +38,7 @@
     "npm": ">=10.0.0"
   },
   "dependencies": {
+    "@google/genai": "2.12.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
     "@types/dompurify": "^3.0.5",

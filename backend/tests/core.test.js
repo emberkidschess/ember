@@ -21,6 +21,58 @@ const {
   getAllowedSessionPlans,
   validateSessionPlan,
 } = require("../dist/domain/courseEnrollment");
+const {
+  cosineSimilarity,
+  isAcademyRelated,
+  normalizeEmbedding,
+  prepareKnowledgeChunks,
+  splitKnowledgeText,
+} = require("../dist/services/knowledgeBaseService");
+
+describe("academy RAG utilities", () => {
+  test("chunks long website content into bounded, overlapping passages", () => {
+    const text = Array.from(
+      { length: 40 },
+      (_, index) => `Section ${index + 1} explains an academy course, class, or policy in a complete sentence.`
+    ).join(" ");
+    const chunks = splitKnowledgeText(text, 420, 60);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.length <= 420)).toBe(true);
+    expect(chunks.every((chunk) => chunk.length > 0)).toBe(true);
+  });
+
+  test("creates stable source-specific chunks ready for embedding", () => {
+    const document = {
+      sourceId: "website:test",
+      category: "courses",
+      title: "Beginner course",
+      url: "/courses",
+      text: "Beginner students learn piece movement, chess rules, and basic checkmates.",
+    };
+    const first = prepareKnowledgeChunks([document]);
+    const second = prepareKnowledgeChunks([document]);
+
+    expect(first).toHaveLength(1);
+    expect(first[0].sourceId).toBe("website:test:chunk:1");
+    expect(first[0].contentHash).toBe(second[0].contentHash);
+  });
+
+  test("normalizes embeddings for cosine retrieval", () => {
+    const vector = normalizeEmbedding([3, 4]);
+    expect(vector[0]).toBeCloseTo(0.6);
+    expect(vector[1]).toBeCloseTo(0.8);
+    expect(cosineSimilarity(vector, vector)).toBeCloseTo(1);
+  });
+
+  test("keeps the assistant academy-only while allowing relevant follow-ups", () => {
+    const weakResult = [{ score: 0.12 }];
+    expect(isAcademyRelated("What are the current fees?", weakResult)).toBe(true);
+    expect(isAcademyRelated("How can my child learn chess online?", weakResult)).toBe(true);
+    expect(isAcademyRelated("Write a movie review", weakResult)).toBe(false);
+    expect(isAcademyRelated("Tell me more about Manish", [{ score: 0.78 }])).toBe(true);
+  });
+});
 
 describe("critical domain utilities", () => {
   test("CSV export neutralizes spreadsheet formulas and preserves quoting", () => {

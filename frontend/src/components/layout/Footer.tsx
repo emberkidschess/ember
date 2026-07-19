@@ -38,8 +38,8 @@ export default function Footer() {
                 sizes="(max-width: 768px) 40px, 40px"
               />
               <div>
-                <span className="font-[family-name:var(--font-playfair)] text-2xl font-bold tracking-tight text-[var(--color-walnut)] block">
-                  Ember<span className="text-[#f85b1c]">Kids</span>
+                <span className="font-[family-name:var(--font-playfair)] text-2xl font-bold tracking-tight text-[#f85b1c] block">
+                  Ember<span className="text-black">Kids</span>
                 </span>
                 <span className="text-[10px] uppercase tracking-[0.25em] text-gray-400 block">
                   Chess Academy

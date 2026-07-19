@@ -54,6 +54,34 @@ cd frontend && npm ci && npm run build && npm start
 
 The backend health endpoint is `GET /health`.
 
+## Academy AI chatbot
+
+The public marketing site includes a Gemini 2.5 Flash assistant backed by a
+MongoDB knowledge index. The index combines curated public website content with
+current public course, roadmap, coach, batch, event, site-config, and testimonial
+records. Private student data, internal notes, class links, coach contact details,
+and payment records are never indexed.
+
+Set these server-side backend variables before deployment:
+
+```bash
+GEMINI_API_KEY=your_google_ai_studio_key
+GEMINI_CHAT_MODEL=gemini-2.5-flash
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+RAG_TOP_K=4
+RAG_REFRESH_MINUTES=15
+```
+
+The backend refreshes changed knowledge in the background on startup and on
+demand. To build the full index explicitly after configuring the key:
+
+```bash
+cd backend && npm run rag:index
+```
+
+Keep `GEMINI_API_KEY` on the backend only; never expose it through a
+`NEXT_PUBLIC_*` variable.
+
 ## Verification
 
 ```bash
