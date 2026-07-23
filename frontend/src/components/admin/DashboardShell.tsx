@@ -228,7 +228,14 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
           }`}
       >
         <div className="flex items-center justify-between px-6 h-16 border-b border-[#dce3df] shrink-0">
-          <Link href={`/${portal}/dashboard`} className="font-[family-name:var(--font-playfair)] font-bold text-lg text-[var(--color-walnut)]">
+          <Link href={`/${portal}/dashboard`} className="flex items-center gap-3 font-[family-name:var(--font-playfair)] font-bold text-lg text-[var(--color-walnut)]">
+            <Image
+              src="https://res.cloudinary.com/aaa97ofg/image/upload/v1783288889/chess-academy/fav.png"
+              alt="logo"
+              width={32}
+              height={32}
+              className="w-8 h-8 object-contain"
+            />
             Ember<span className="text-[var(--color-ember)]">Kids</span> <span className="text-[var(--color-muted)]">{portal === "admin" ? "Admin" : (user.role === "coach" ? "Coach" : "Staff")}</span>
           </Link>
           <button
@@ -299,13 +306,9 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
               onClick={() => setUserMenuOpen((v) => !v)}
               className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-full hover:bg-[var(--color-ivory)] transition-colors"
             >
-              <Image
-                src="https://res.cloudinary.com/aaa97ofg/image/upload/v1783288889/chess-academy/fav.png"
-                alt="logo"
-                width={32}
-                height={32}
-                className="w-8 h-8 object-contain"
-              />
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-ember)] text-white text-sm font-bold">
+                {user.name?.[0]?.toUpperCase() || "U"}
+              </span>
               <span className="hidden sm:block text-sm font-medium text-[var(--color-walnut)]">{user.name}</span>
               <ChevronDown className="hidden sm:block h-4 w-4 text-[var(--color-muted)]" />
             </button>
