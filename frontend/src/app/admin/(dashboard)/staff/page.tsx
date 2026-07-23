@@ -415,7 +415,7 @@ export default function StaffPage() {
                     onClick={() => handleExpertiseToggle(level)}
                     className={`rounded-full border px-3 py-1.5 text-sm font-bold transition ${
                       form.expertise.includes(level)
-                        ? "border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]"
+                        ? "border-[rgba(217,103,69,0.32)] bg-[var(--color-gold)]/15 text-[var(--color-ember-deep)]"
                         : "border-[var(--color-line)] bg-[var(--color-paper)] text-[var(--color-muted)] hover:bg-[var(--color-ivory)]"
                     }`}
                   >

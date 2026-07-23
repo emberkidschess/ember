@@ -40,6 +40,9 @@ export interface IAttendance extends Document {
   source?: AttendanceSource;
   // Undefined while NOT_MARKED, for the same reason as source above.
   markedAt?: Date;
+  // Exact package credit consumed by this attendance. This remains stable
+  // even when a queued renewal becomes the student's current package.
+  consumedPackageId?: mongoose.Types.ObjectId;
   joinClickedAt?: Date;
   notes?: string;
   markedBy?: mongoose.Types.ObjectId;
@@ -88,6 +91,11 @@ const AttendanceSchema: Schema = new Schema(
     },
     markedAt: {
       type: Date,
+    },
+    consumedPackageId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Package',
+      index: true,
     },
     joinClickedAt: {
       type: Date,

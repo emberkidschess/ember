@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 type EmailTemplate =
   | 'password_reset'
   | 'class_scheduled'
+  | 'class_reminder'
   | 'class_rescheduled'
   | 'class_cancelled'
   | 'trial_scheduled'
@@ -25,6 +26,10 @@ class EmailService {
 
   constructor() {
     this.init();
+  }
+
+  isConfigured(): boolean {
+    return Boolean(this.transporter);
   }
 
   private init(): void {
@@ -149,6 +154,23 @@ class EmailService {
             ${data.meetingLink ? `<p style="margin:0;"><strong>Meeting Link:</strong> <a href="${data.meetingLink}" style="color:#e04a15;text-decoration:none;">Join Class</a></p>` : ''}
           </div>
           <p style="margin:0 0 16px;line-height:1.6;">Please ensure ${data.studentName} is prepared and joins on time.</p>
+        `),
+      },
+      class_reminder: {
+        subject: `Reminder: Class in 1 hour - ${data.date} at ${data.startTime}`,
+        html: base(`
+          <h2 style="color:#1a1a2e;margin-bottom:16px;">Your Class Starts in 1 Hour</h2>
+          <p style="margin:0 0 16px;line-height:1.6;">Dear ${data.parentName},</p>
+          <p style="margin:0 0 16px;line-height:1.6;">This is a friendly reminder that <strong>${data.studentName}</strong> has a chess class coming up soon.</p>
+          <div style="background:#f8f9fa;padding:20px;border-radius:8px;margin:16px 0;">
+            <p style="margin:0 0 8px;"><strong>Course:</strong> ${data.course}</p>
+            ${data.batchName ? `<p style="margin:0 0 8px;"><strong>Batch:</strong> ${data.batchName}</p>` : ''}
+            <p style="margin:0 0 8px;"><strong>Date:</strong> ${data.date}</p>
+            <p style="margin:0 0 8px;"><strong>Time:</strong> ${data.startTime} – ${data.endTime} (${data.timezone})</p>
+            ${data.coachName ? `<p style="margin:0 0 8px;"><strong>Coach:</strong> ${data.coachName}</p>` : ''}
+            ${data.meetingLink ? `<p style="margin:0;"><strong>Meeting Link:</strong> <a href="${data.meetingLink}" style="color:#e04a15;text-decoration:none;">Join Class</a></p>` : ''}
+          </div>
+          <p style="margin:0 0 16px;line-height:1.6;">Please be ready a few minutes early so ${data.studentName} can join on time.</p>
         `),
       },
       class_rescheduled: {

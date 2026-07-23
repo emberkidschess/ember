@@ -248,9 +248,9 @@ export default function LeadsPage() {
                   </td>
                   <td className="whitespace-nowrap">
                     {lead.convertedToStudent ? (
-                      <span className="rounded-full border border-[rgba(63,107,92,0.22)] bg-[var(--color-pine)]/10 px-2.5 py-1 text-xs font-bold text-[var(--color-pine-deep)]">Yes</span>
+                      <span className="rounded-full border border-[rgba(35,96,75,0.22)] bg-[var(--color-pine)]/10 px-2.5 py-1 text-xs font-bold text-[var(--color-pine-deep)]">Yes</span>
                     ) : (
-                      <span className="rounded-full border border-[rgba(31,27,22,0.16)] bg-[var(--color-walnut)]/10 px-2.5 py-1 text-xs font-bold text-[var(--color-walnut)]">No</span>
+                      <span className="rounded-full border border-[rgba(23,35,31,0.16)] bg-[var(--color-walnut)]/10 px-2.5 py-1 text-xs font-bold text-[var(--color-walnut)]">No</span>
                     )}
                   </td>
                   <td className="whitespace-nowrap text-right text-sm font-medium">

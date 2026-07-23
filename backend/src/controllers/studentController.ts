@@ -13,6 +13,10 @@ import { CacheService, generateCacheKey, CacheNamespaces } from '../utils/cache'
 import { classAccessWindow, classWindow, localCalendarDateAsUtc } from '../utils/dateTime';
 import { ClientAuthService } from '../services/clientAuthService';
 import { getCourseSessionTotal, isCourseLevel } from '../domain/courseEnrollment';
+import {
+  addStudentsToScheduledBatchClasses,
+  removeStudentFromScheduledBatchClasses,
+} from '../services/batchSchedulingService';
 
 const invalidateStudentCaches = async (studentId: string): Promise<void> => {
   await Promise.all([
@@ -848,6 +852,11 @@ export const freezeStudentPortal = async (req: AuthRequest, res: Response) => {
     student.unfrozenAt = undefined;
     student.unfrozenBy = undefined;
     await student.save();
+    if (student.currentBatchId) {
+      // Keep historical membership, but stop future scheduled sessions while
+      // the portal is paused. A currently running class is never mutated.
+      await removeStudentFromScheduledBatchClasses(student.currentBatchId, student._id.toString());
+    }
     await invalidateStudentCaches(id);
 
     await AuditLog.create(buildAuditLogData(req, {
@@ -891,11 +900,9 @@ export const freezeStudentPortal = async (req: AuthRequest, res: Response) => {
 };
 
 /**
- * Resumes a frozen student's portal. Package countdown resumes and they
- * become eligible for new class generation again starting from the next
- * batch class scheduled after this point - already-scheduled classes
- * during the freeze window (if any were created before freezing) are
- * untouched.
+ * Resumes a frozen student's portal. Package countdown resumes and upcoming
+ * scheduled class rosters are restored. Historical and currently running
+ * classes remain unchanged.
  */
 export const unfreezeStudentPortal = async (req: AuthRequest, res: Response) => {
   try {
@@ -917,6 +924,10 @@ export const unfreezeStudentPortal = async (req: AuthRequest, res: Response) => 
     student.unfrozenAt = new Date();
     student.unfrozenBy = req.user?.userId as any;
     await student.save();
+    if (student.currentBatchId) {
+      // Restore only upcoming sessions after the pause; history remains intact.
+      await addStudentsToScheduledBatchClasses(student.currentBatchId, [student._id.toString()]);
+    }
     await invalidateStudentCaches(id);
 
     await AuditLog.create(buildAuditLogData(req, {

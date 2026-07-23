@@ -541,6 +541,17 @@ export const rescheduleClass = async (req: AuthRequest, res: Response) => {
     existingClass.startTime = startTime || existingClass.startTime;
     existingClass.endTime = endTime || existingClass.endTime;
     existingClass.status = ClassStatus.SCHEDULED;
+    // A moved class has a new reminder window. Clear the old marker so the
+    // one-hour sweep can notify students about the rescheduled slot. Start
+    // tracking must also be reset; otherwise a previously completed/missed
+    // slot would make the new slot look already started.
+    existingClass.classReminderProcessingAt = undefined;
+    existingClass.classReminderQueuedAt = undefined;
+    existingClass.startedAt = undefined;
+    existingClass.startedBy = undefined;
+    existingClass.unstartedAlertProcessingAt = undefined;
+    existingClass.unstartedAlertQueuedAt = undefined;
+    existingClass.unstartedAt = undefined;
     existingClass.rescheduledFrom = previous;
     await existingClass.save();
 
@@ -821,7 +832,30 @@ export const deleteClass = async (req: AuthRequest, res: Response) => {
     }).session(session);
 
     for (const record of consumedAttendance) {
-      await reversePackageConsumption(record.student, existingClass._id, session);
+      await reversePackageConsumption(record.student, existingClass._id, session, record.consumedPackageId);
+    }
+
+    // A deleted batch class that never counted toward progress (including a
+    // genuinely missed class) must release its session slot so staff can
+    // schedule a replacement. Completed sessions remain historical.
+    if (existingClass.batch && existingClass.sessionNumber && !existingClass.batchProgressCounted) {
+      const Batch = (await import('../models/Batch')).default;
+      await Batch.updateOne(
+        {
+          _id: existingClass.batch,
+          sessions: {
+            $elemMatch: {
+              sessionNumber: existingClass.sessionNumber,
+              classId: existingClass._id,
+            },
+          },
+        },
+        {
+          $set: { 'sessions.$.status': 'planned' },
+          $unset: { 'sessions.$.classId': '' },
+        },
+        { session }
+      );
     }
 
     await Attendance.deleteMany({ class: existingClass._id }).session(session);
@@ -947,6 +981,66 @@ export const getMyClasses = async (req: ClientAuthRequest, res: Response) => {
       success: false,
       error: 'Failed to fetch your classes due to server error',
     });
+  }
+};
+
+/**
+ * Records that the assigned coach opened a scheduled class. This is kept
+ * separate from student attendance: a student can join the meeting even if
+ * the coach forgets to click Start Now, and the end-of-class sweep uses both
+ * signals before deciding whether a session was actually missed.
+ */
+export const startClass = async (req: AuthRequest, res: Response) => {
+  try {
+    const classData = await Class.findById(req.params.id);
+    if (!classData) return res.status(404).json({ success: false, error: 'Class not found' });
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+    if (!isAdmin && classData.coach.toString() !== req.user?.userId) {
+      return res.status(403).json({ success: false, error: 'You can only start classes assigned to you' });
+    }
+    if (classData.status !== ClassStatus.SCHEDULED) {
+      return res.status(400).json({ success: false, error: 'This class is not scheduled' });
+    }
+
+    const now = new Date();
+    const { opensAt, closesAt } = classAccessWindow(classData);
+    if (now < opensAt) {
+      return res.status(400).json({ success: false, error: 'This class is not open yet', opensAt });
+    }
+    if (now > closesAt) {
+      return res.status(400).json({ success: false, error: 'This class has already ended' });
+    }
+
+    if (!classData.startedAt) {
+      classData.startedAt = now;
+      // `startedBy` references Staff; for an admin-initiated recovery the
+      // audit log below is the source of truth instead of storing an Admin id
+      // in a Staff reference.
+      if (req.user?.authType === 'staff') classData.startedBy = req.user.userId as any;
+      classData.unstartedAlertProcessingAt = undefined;
+      classData.unstartedAlertQueuedAt = undefined;
+      classData.unstartedAt = undefined;
+      await classData.save();
+
+      await AuditLog.create(buildAuditLogData(req, {
+        action: AuditAction.UPDATE,
+        entityType: AuditEntityType.CLASS,
+        entityId: classData._id,
+        entityName: `Started class for ${classData.course}`,
+        details: { startedAt: now },
+        success: true,
+      }));
+    }
+
+    return res.json({
+      success: true,
+      data: { meetingLink: classData.meetingLink, startedAt: classData.startedAt },
+      message: 'Class start recorded',
+    });
+  } catch (error: any) {
+    console.error('Error recording class start:', error);
+    if (error.name === 'CastError') return res.status(400).json({ success: false, error: 'Invalid class ID format' });
+    return res.status(500).json({ success: false, error: 'Failed to record class start' });
   }
 };
 

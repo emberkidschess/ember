@@ -358,7 +358,10 @@ export async function addStudentsToScheduledBatchClasses(
   const now = new Date();
   const candidates = await futureScheduledClasses(batchId, options).lean();
   const classes = candidates.filter(
-    (item: any) => classWindow(item).endAt > now
+    // Do not mutate a class that is already in progress. A package can reach
+    // zero when the student joins their final session; that live class must
+    // retain its roster and attendance linkage.
+    (item: any) => classWindow(item).startAt > now
   );
   if (classes.length === 0) return;
 
@@ -433,24 +436,26 @@ export async function assertCoachAvailableForScheduledBatch(
 
 export async function removeStudentFromScheduledBatchClasses(
   batchId: string | mongoose.Types.ObjectId,
-  studentId: string
+  studentId: string,
+  options: SessionOption = {}
 ): Promise<void> {
   const now = new Date();
-  const candidates = await futureScheduledClasses(batchId).lean();
+  const candidates = await futureScheduledClasses(batchId, options).lean();
   const classIds = candidates
-    .filter((item: any) => classWindow(item).endAt > now)
+    .filter((item: any) => classWindow(item).startAt > now)
     .map((item) => item._id);
   if (classIds.length === 0) return;
   await Class.updateMany(
     { _id: { $in: classIds } },
-    { $pull: { students: studentId } }
+    { $pull: { students: studentId } },
+    options.session ? { session: options.session } : undefined
   );
   await Attendance.deleteMany({
     class: { $in: classIds },
     student: studentId,
     status: AttendanceStatus.NOT_MARKED,
     attendanceConsumed: false,
-  });
+  }, options.session ? { session: options.session } : undefined);
 }
 
 export function classAccessDto(classItem: any, includeMeetingLink = false) {

@@ -13,6 +13,7 @@ import {
   RENEWAL_REMINDER_THRESHOLD,
   getCourseSessionTotal,
 } from '../domain/courseEnrollment';
+import { removeStudentFromScheduledBatchClasses } from './batchSchedulingService';
 
 export async function assertCourseEnrollmentCapacity(
   studentId: mongoose.Types.ObjectId | string,
@@ -157,6 +158,18 @@ export async function handleExhaustedPackage(
   currentPackage.status = PackageStatus.EXPIRED;
   await currentPackage.save({ session });
   const now = new Date();
+  const expiredStudent = await Student.findById(currentPackage.student)
+    .select('currentBatchId')
+    .session(session);
+  if (expiredStudent?.currentBatchId) {
+    // Keep historical batch membership for reporting, but remove the student
+    // from future class rosters and attendance placeholders until renewal.
+    await removeStudentFromScheduledBatchClasses(
+      expiredStudent.currentBatchId,
+      currentPackage.student.toString(),
+      { session }
+    );
+  }
   await Student.findByIdAndUpdate(
     currentPackage.student,
     {

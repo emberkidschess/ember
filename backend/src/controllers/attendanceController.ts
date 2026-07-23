@@ -5,6 +5,8 @@ import { AuthRequest } from '../middleware/auth';
 import { ClientAuthRequest } from '../middleware/clientAuth';
 import AuditLog, { AuditAction, AuditEntityType } from '../models/AuditLog';
 import Package, { PackageStatus } from '../models/Package';
+import ClientAuth from '../models/ClientAuth';
+import { AuthStatus } from '../models/BaseAuth';
 import Class from '../models/Class';
 import Student from '../models/Student';
 import Batch from '../models/Batch';
@@ -19,6 +21,7 @@ import { sendNotification } from '../utils/notificationProcessor';
 import { NotificationChannel, NotificationType } from '../models/Notification';
 import { ensureBatchSessionPlan } from '../domain/courseEnrollment';
 import { sanitizePaginationParams, sanitizeQueryParam } from '../utils/validation';
+import { addStudentsToScheduledBatchClasses } from '../services/batchSchedulingService';
 
 export async function finalizeClassBatchProgress(
   classId: mongoose.Types.ObjectId | string,
@@ -131,21 +134,25 @@ async function consumePackageForAttendance(
 export async function reversePackageConsumption(
   studentId: any,
   classId: any,
-  session: mongoose.ClientSession
+  session: mongoose.ClientSession,
+  consumedPackageId?: mongoose.Types.ObjectId | string,
 ): Promise<void> {
   const classData = await Class.findById(classId).session(session);
   if (!classData || classData.classType !== 'regular') return;
 
   const student = await Student.findById(studentId).session(session);
-  if (!student || !student.currentPackageId) return;
+  if (!student || (!student.currentPackageId && !consumedPackageId)) return;
 
-  const packageData = await Package.findById(student.currentPackageId).session(session);
+  const packageData = await Package.findById(consumedPackageId || student.currentPackageId).session(session);
   if (!packageData) return;
 
   const currentValue = packageData.regularClassesCompleted || 0;
   if (currentValue <= 0) return;
 
-  const wasCompleted = packageData.status === 'completed' && packageData.remainingClasses === 0;
+  const wasExhausted =
+    [PackageStatus.COMPLETED, PackageStatus.EXPIRED].includes(packageData.status) &&
+    packageData.remainingClasses === 0;
+  const isCurrentPackage = student.currentPackageId?.toString() === packageData._id.toString();
   await Package.findByIdAndUpdate(
     packageData._id,
     {
@@ -154,10 +161,41 @@ export async function reversePackageConsumption(
         completedClasses: -1,
         remainingClasses: 1,
       },
-      ...(wasCompleted ? { $set: { status: 'active' } } : {}),
+      ...(wasExhausted && isCurrentPackage ? { $set: { status: PackageStatus.ACTIVE } } : {}),
     },
     { session }
   );
+
+  // Undoing the final attendance of the current expired package restores
+  // access and rebuilds only future roster entries. A completed package with
+  // a queued renewal is not current, so it must not take over the student.
+  if (wasExhausted && isCurrentPackage) {
+    await Student.findByIdAndUpdate(
+      student._id,
+      {
+        $set: {
+          enrollmentStatus: 'enrolled',
+          studentStatus: 'active',
+          portalStatus: 'active',
+        },
+        $unset: { expiredAt: '', portalExpiryDate: '' },
+        $inc: { sessionVersion: 1 },
+      },
+      { session, runValidators: true }
+    );
+    await ClientAuth.findOneAndUpdate(
+      { profileId: student._id },
+      { $set: { status: AuthStatus.ACTIVE } },
+      { session }
+    );
+    if (student.currentBatchId) {
+      await addStudentsToScheduledBatchClasses(
+        student.currentBatchId,
+        [student._id.toString()],
+        { session }
+      );
+    }
+  }
 
 }
 
@@ -458,6 +496,9 @@ export const joinClass = async (req: ClientAuthRequest, res: Response) => {
     attendance.joinClickedAt = now;
     attendance.markedAt = now;
     attendance.attendanceConsumed = !!consumeResult.creditConsumed;
+    attendance.consumedPackageId = consumeResult.creditConsumed
+      ? consumeResult.packageId as any
+      : undefined;
     await attendance.save({ session });
 
     await AuditLog.create([{
@@ -620,8 +661,12 @@ export const resolveDispute = async (req: AuthRequest, res: Response) => {
       };
       attendance.status = AttendanceStatus.PRESENT;
       attendance.attendanceConsumed = !!consumeResult.creditConsumed;
+      attendance.consumedPackageId = consumeResult.creditConsumed
+        ? consumeResult.packageId as any
+        : undefined;
     } else {
       attendance.status = AttendanceStatus.ABSENT;
+      attendance.consumedPackageId = undefined;
     }
 
     attendance.disputeApproved = approved;
@@ -722,9 +767,18 @@ export const overrideAttendance = async (req: AuthRequest, res: Response) => {
         authIdToRevoke: consumeResult.authIdToRevoke,
       };
       attendance.attendanceConsumed = !!consumeResult.creditConsumed;
+      attendance.consumedPackageId = consumeResult.creditConsumed
+        ? consumeResult.packageId as any
+        : undefined;
     } else if (status === AttendanceStatus.ABSENT && attendance.attendanceConsumed) {
-      await reversePackageConsumption(attendance.student, attendance.class, session);
+      await reversePackageConsumption(
+        attendance.student,
+        attendance.class,
+        session,
+        attendance.consumedPackageId
+      );
       attendance.attendanceConsumed = false;
+      attendance.consumedPackageId = undefined;
     }
 
     attendance.status = status;
@@ -793,7 +847,12 @@ export const deleteAttendance = async (req: AuthRequest, res: Response) => {
     }
 
     if (attendance.attendanceConsumed) {
-      await reversePackageConsumption(attendance.student, attendance.class, session);
+      await reversePackageConsumption(
+        attendance.student,
+        attendance.class,
+        session,
+        attendance.consumedPackageId
+      );
     }
 
     await Attendance.findByIdAndDelete(req.params.id).session(session);

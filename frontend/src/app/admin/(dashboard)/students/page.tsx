@@ -264,7 +264,7 @@ export default function StudentsPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {formError && <div className="bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)] px-4 py-3 rounded-xl text-sm">{formError}</div>}
           {!editingId && (
-            <div className="bg-[var(--color-gold)]/10 text-[#8a6418] px-4 py-3 rounded-xl text-sm">
+            <div className="bg-[var(--color-gold)]/10 text-[var(--color-ember-deep)] px-4 py-3 rounded-xl text-sm">
               This creates the student profile. Portal login is created when package payment is activated, or manually from the student profile.
             </div>
           )}

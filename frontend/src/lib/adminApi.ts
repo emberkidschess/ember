@@ -465,6 +465,8 @@ export interface ClassItem {
   startsAt?: string;
   accessClosesAt?: string;
   canStart?: boolean;
+  startedAt?: string;
+  startedBy?: { _id: string; name: string } | string;
   createdAt: string;
 }
 
@@ -472,6 +474,8 @@ export const getClasses = (params?: { status?: string; classType?: string; stude
   adminFetchJSON<ApiListResponse<ClassItem>>(`/classes${toQueryString({ limit: 100, ...params })}`);
 
 export const getClass = (id: string) => adminFetchJSON<ApiItemResponse<ClassItem>>(`/classes/${id}`);
+export const startClass = (id: string) =>
+  adminFetchJSON<ApiItemResponse<{ meetingLink?: string; startedAt?: string }>>(`/classes/${id}/start`, { method: "POST" });
 export const createClass = (payload: Partial<Omit<ClassItem, "_id" | "createdAt">>) =>
   adminFetchJSON<ApiItemResponse<ClassItem>>("/classes", { method: "POST", body: JSON.stringify(payload) });
 export const updateClass = (id: string, payload: Partial<Omit<ClassItem, "_id" | "createdAt">>) =>

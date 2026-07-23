@@ -38,6 +38,7 @@ export interface IStaff extends Document {
   lockedUntil?: Date;
   // Session management for global revocation
   sessionVersion?: number;
+  dailyScheduleLastSentKey?: string;
   // Audit trail references
   auditLogs?: mongoose.Types.ObjectId[];
   createdAt: Date;
@@ -126,6 +127,9 @@ const StaffSchema = new Schema({
   sessionVersion: {
     type: Number,
     default: 1,
+  },
+  dailyScheduleLastSentKey: {
+    type: String,
   },
   // Audit trail references
   auditLogs: [{

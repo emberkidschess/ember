@@ -22,6 +22,7 @@ import {
   assertPackageCanRenew,
   assertPackageCanUpgrade,
 } from '../services/enrollmentLifecycleService';
+import { addStudentsToScheduledBatchClasses } from '../services/batchSchedulingService';
 import { sanitizePaginationParams, sanitizeQueryParam } from '../utils/validation';
 
 function sendPackageError(res: Response, error: unknown, fallback: string) {
@@ -79,6 +80,17 @@ async function linkActivePackageToStudent(
   }
 
   await Student.findByIdAndUpdate(student._id, update, { session, runValidators: true });
+
+  // Package creation/renewal can restore an expired student after their
+  // future class rosters were removed. Rebuild only upcoming roster entries;
+  // frozen students stay paused until an explicit unfreeze.
+  if (student.currentBatchId && portalStatus === PortalStatus.ACTIVE) {
+    await addStudentsToScheduledBatchClasses(
+      student.currentBatchId,
+      [student._id.toString()],
+      { session }
+    );
+  }
 
   const clientAuth = await ClientAuth.findOneAndUpdate(
     { profileId: student._id },

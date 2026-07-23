@@ -98,7 +98,15 @@ export function buildWebsiteKnowledge(profile: SiteProfile): KnowledgeDocumentIn
       title: 'Class format and batch timing',
       url: '/contact',
       text:
-        'EmberKids offers flexible batch timing options, including weekday, evening and weekend possibilities, subject to current availability and the child’s assessed level. Public class information describes live online small-group sessions with a maximum of six students. For the latest batch schedule in the family’s timezone, visitors should contact the academy or book the free assessment.',
+        'EmberKids offers three batch formats: 1:1 personalised coaching, Premium Group batches with 2–3 students, and Standard batches with 5–6 students. Batch timing options include weekday, evening and weekend possibilities, subject to current availability and the child’s assessed level. For the latest schedule in the family’s timezone, visitors should contact the academy or book the free assessment.',
+    },
+    {
+      sourceId: 'website:batches:options',
+      category: 'batches',
+      title: 'Batch types and group sizes',
+      url: '/contact',
+      text:
+        'The academy provides three learning formats: 1:1 one-to-one coaching, Premium Group batches of 2–3 students, and Standard batches of 5–6 students. Current availability and timing are confirmed by the academy consultant after understanding the child’s level and requirements.',
     },
     {
       sourceId: 'website:fees:availability',

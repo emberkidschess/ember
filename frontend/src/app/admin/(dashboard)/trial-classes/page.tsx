@@ -200,17 +200,17 @@ export default function TrialClassesPage() {
     const badgeBase = "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold";
     switch (result) {
       case 'recommended':
-        return <span className={`${badgeBase} border-[rgba(63,107,92,0.22)] bg-[var(--color-pine)]/10 text-[var(--color-pine-deep)]`}><CheckCircle className="h-3 w-3" /> Recommended</span>;
+        return <span className={`${badgeBase} border-[rgba(35,96,75,0.22)] bg-[var(--color-pine)]/10 text-[var(--color-pine-deep)]`}><CheckCircle className="h-3 w-3" /> Recommended</span>;
       case 'not_recommended':
-        return <span className={`${badgeBase} border-[rgba(199,93,60,0.22)] bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)]`}><XCircle className="h-3 w-3" /> Not Recommended</span>;
+        return <span className={`${badgeBase} border-[rgba(224,74,21,0.22)] bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)]`}><XCircle className="h-3 w-3" /> Not Recommended</span>;
       case 'needs_follow_up':
-        return <span className={`${badgeBase} border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]`}><Clock className="h-3 w-3" /> Follow-up</span>;
+        return <span className={`${badgeBase} border-[rgba(217,103,69,0.32)] bg-[var(--color-gold)]/15 text-[var(--color-ember-deep)]`}><Clock className="h-3 w-3" /> Follow-up</span>;
       case 'reschedule_requested':
-        return <span className={`${badgeBase} border-[rgba(31,27,22,0.16)] bg-[var(--color-walnut)]/10 text-[var(--color-walnut)]`}><RotateCcw className="h-3 w-3" /> Reschedule</span>;
+        return <span className={`${badgeBase} border-[rgba(23,35,31,0.16)] bg-[var(--color-walnut)]/10 text-[var(--color-walnut)]`}><RotateCcw className="h-3 w-3" /> Reschedule</span>;
       case 'expired':
-        return <span className={`${badgeBase} border-[rgba(199,93,60,0.22)] bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)]`}><XCircle className="h-3 w-3" /> Expired</span>;
+        return <span className={`${badgeBase} border-[rgba(224,74,21,0.22)] bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)]`}><XCircle className="h-3 w-3" /> Expired</span>;
       default:
-        return <span className={`${badgeBase} border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]`}><Clock className="h-3 w-3" /> Pending</span>;
+        return <span className={`${badgeBase} border-[rgba(217,103,69,0.32)] bg-[var(--color-gold)]/15 text-[var(--color-ember-deep)]`}><Clock className="h-3 w-3" /> Pending</span>;
     }
   };
 

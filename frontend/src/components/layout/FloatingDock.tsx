@@ -8,7 +8,7 @@ import { useSiteConfig } from "@/lib/site";
 
 export default function FloatingDock() {
   const [isFooterVisible, setIsFooterVisible] = useState(false);
-  const [showWhatsappTooltip, setShowWhatsappTooltip] = useState(true);
+  const [showChatbotTooltip, setShowChatbotTooltip] = useState(true);
   const { siteConfig } = useSiteConfig();
   const whatsappHref = siteConfig?.profile?.whatsappHref || "https://wa.me/919876543210";
 
@@ -31,9 +31,9 @@ export default function FloatingDock() {
   useEffect(() => {
     let scrollTimeout: ReturnType<typeof setTimeout>;
     const handleScroll = () => {
-      setShowWhatsappTooltip(false);
+      setShowChatbotTooltip(false);
       clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => setShowWhatsappTooltip(true), 500);
+      scrollTimeout = setTimeout(() => setShowChatbotTooltip(true), 500);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -44,7 +44,7 @@ export default function FloatingDock() {
   }, []);
 
   return (
-    <div className="fixed bottom-3.5 right-2 z-[100] flex flex-col items-end gap-2 sm:bottom-6 sm:right-6">
+    <div className="pointer-events-none fixed inset-x-0 bottom-3.5 z-[100] flex flex-row items-end justify-between px-4 sm:bottom-6 sm:px-6">
       <style jsx>{`
         @keyframes whatsappWave {
           0% {
@@ -69,7 +69,7 @@ export default function FloatingDock() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 15 }}
             transition={{ type: "spring", stiffness: 250, damping: 25 }}
-            className="relative"
+            className="pointer-events-auto relative order-2"
           >
             <motion.a
               href={whatsappHref}
@@ -88,30 +88,18 @@ export default function FloatingDock() {
                 className="whatsapp-wave pointer-events-none absolute inset-0 rounded-full bg-[#25D366]"
               />
 
-              <AnimatePresence>
-                {showWhatsappTooltip && (
-                  <motion.span
-                    initial={{ opacity: 0, y: 10, scale: 0.8 }}
-                    animate={{ opacity: 1, y: 0, scale: 1, rotate: [-3, 3, -3, 3, -3] }}
-                    exit={{ opacity: 0, y: 10, scale: 0.8 }}
-                    transition={{
-                      opacity: { type: "spring", stiffness: 300, damping: 20 },
-                      rotate: { duration: 2.5, repeat: Infinity, ease: "easeInOut" },
-                    }}
-                    className="pointer-events-none absolute bottom-full left-1/2 mb-3 -translate-x-1/2 whitespace-nowrap rounded-full border-2 border-[#25D366] bg-white px-3 py-1.5 text-xs font-medium text-gray-800 shadow-lg sm:px-4 sm:py-2 sm:text-sm"
-                  >
-                    hello 👋🏻
-                  </motion.span>
-                )}
-              </AnimatePresence>
-
               <FaWhatsapp className="relative z-10 text-2xl" aria-hidden="true" />
             </motion.a>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <AcademyChatbot launcherVisible={!isFooterVisible} />
+      <div className="pointer-events-auto order-1">
+        <AcademyChatbot
+          launcherVisible={!isFooterVisible}
+          showLauncherMessage={showChatbotTooltip && !isFooterVisible}
+        />
+      </div>
     </div>
   );
 }

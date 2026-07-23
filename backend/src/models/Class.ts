@@ -48,6 +48,19 @@ export interface IClass extends Document {
   trialJoinedAt?: Date;
   trialAttemptNumber?: number;
   trialReminderSentAt?: Date;
+  // One-hour reminder delivery marker. The scheduler claims a class before
+  // queueing notifications and only sets this after all recipients are
+  // queued, making the sweep safe to run every minute without duplicates.
+  classReminderProcessingAt?: Date;
+  classReminderQueuedAt?: Date;
+  // Coach start tracking lets the academy distinguish a completed class from
+  // a scheduled session that nobody opened. `startedAt` is recorded by the
+  // staff portal when the coach clicks Start Now.
+  startedAt?: Date;
+  startedBy?: mongoose.Types.ObjectId;
+  unstartedAlertProcessingAt?: Date;
+  unstartedAlertQueuedAt?: Date;
+  unstartedAt?: Date;
   trialExpiresAt?: Date;
   // Class notes hub: coach's post-class notes/homework, broadcast to
   // every enrolled student's dashboard the moment it's saved.
@@ -216,6 +229,34 @@ const ClassSchema: Schema = new Schema(
     },
     trialReminderSentAt: {
       type: Date,
+    },
+    classReminderProcessingAt: {
+      type: Date,
+      index: true,
+    },
+    classReminderQueuedAt: {
+      type: Date,
+      index: true,
+    },
+    startedAt: {
+      type: Date,
+      index: true,
+    },
+    startedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'Staff',
+    },
+    unstartedAlertProcessingAt: {
+      type: Date,
+      index: true,
+    },
+    unstartedAlertQueuedAt: {
+      type: Date,
+      index: true,
+    },
+    unstartedAt: {
+      type: Date,
+      index: true,
     },
     trialExpiresAt: {
       type: Date,

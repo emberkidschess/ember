@@ -2,33 +2,36 @@
 
 @theme {
   /* ── Base & Backgrounds ── */
-  --color-ivory: #fbf6ec;
-  --color-ivory-deep: #f3ecdc;
-  --color-paper: #fffdf8;
+  /* Shared student-portal palette used by every authenticated workspace. */
+  --color-ivory: #f3f6f4;
+  --color-ivory-deep: #eef1ef;
+  /* Compatibility alias for older admin primitives. */
+  --color-cream: #eef1ef;
+  --color-paper: #ffffff;
 
   /* ── Text ── */
-  --color-walnut: #1f1b16;
-  --color-walnut-soft: #3b332b;
-  --color-muted: #756a5d;
+  --color-walnut: #17231f;
+  --color-walnut-soft: #2f3d37;
+  --color-muted: #75817c;
 
   /* ── Accents ── */
-  --color-ember: #c75d3c;
-  --color-ember-deep: #a8472a;
-  --color-pine: #3f6b5c;
-  --color-pine-deep: #2e4f44;
-  --color-gold: #e0a33d;
+  --color-ember: #e04a15;
+  --color-ember-deep: #c73d0e;
+  --color-pine: #23604b;
+  --color-pine-deep: #1f5c48;
+  --color-gold: #d96745;
 
   /* ── Typography ── */
   --font-playfair: "Playfair Display", Georgia, "Times New Roman", serif;
   --font-dm-sans: "DM Sans", system-ui, sans-serif;
 
   /* ── Borders & Dividers ── */
-  --color-line: rgba(31, 27, 22, 0.12);
-  --color-line-strong: rgba(31, 27, 22, 0.22);
+  --color-line: #dce3df;
+  --color-line-strong: #c7d2cc;
 
   /* ── Elevations ── */
-  --shadow-soft: 0 24px 70px -40px rgba(31, 27, 22, 0.45);
-  --shadow-card: 0 20px 45px -32px rgba(31, 27, 22, 0.5);
+  --shadow-soft: 0 24px 70px -40px rgba(23, 35, 31, 0.32);
+  --shadow-card: 0 18px 50px -38px rgba(23, 35, 31, 0.55);
 }
 
 /* ── Base ── */
@@ -37,7 +40,7 @@ html {
 }
 
 body {
-  background-color: var(--color-paper);
+  background-color: var(--color-ivory);
   color: var(--color-walnut);
   font-family: var(--font-dm-sans), system-ui, sans-serif;
 }
@@ -52,7 +55,7 @@ body {
   padding: 0.75rem;
   border: 1px solid var(--color-line);
   border-radius: 18px;
-  background: rgba(255, 253, 248, 0.9);
+  background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--shadow-card);
 }
 
@@ -130,12 +133,12 @@ body {
 }
 
 .admin-table thead {
-  background: rgba(243, 236, 220, 0.72);
+  background: rgba(238, 241, 239, 0.88);
 }
 
 .admin-table th {
   padding: 0.875rem 1.5rem;
-  color: #756a5d;
+  color: var(--color-muted);
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -155,7 +158,7 @@ body {
 }
 
 .admin-table tbody tr:hover {
-  background: rgba(243, 236, 220, 0.42);
+  background: rgba(238, 241, 239, 0.72);
 }
 
 .admin-table :is(.text-gray-400, .text-gray-500, .text-gray-600, .text-gray-700, .text-gray-800, .text-gray-900) {
@@ -184,8 +187,8 @@ body {
   height: 64px;
   margin: 0 auto 1.5rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(199, 93, 60, 0.1), rgba(224, 163, 61, 0.1));
-  border: 2px dashed rgba(117, 106, 93, 0.3);
+  background: linear-gradient(135deg, rgba(224, 74, 21, 0.1), rgba(35, 96, 75, 0.1));
+  border: 2px dashed rgba(117, 129, 124, 0.3);
 }
 
 .admin-empty p {
@@ -233,29 +236,29 @@ body {
 }
 
 .admin-alert-error {
-  border-color: rgba(199, 93, 60, 0.34);
-  background: rgba(199, 93, 60, 0.09);
+  border-color: rgba(224, 74, 21, 0.34);
+  background: rgba(224, 74, 21, 0.09);
   color: var(--color-ember-deep);
 }
 
 .admin-alert-success {
-  border-color: rgba(63, 107, 92, 0.34);
-  background: rgba(63, 107, 92, 0.09);
+  border-color: rgba(35, 96, 75, 0.34);
+  background: rgba(35, 96, 75, 0.09);
   color: var(--color-pine-deep);
 }
 
 .admin-note {
   border-radius: 14px;
-  border: 1px solid rgba(224, 163, 61, 0.38);
-  background: rgba(224, 163, 61, 0.12);
-  color: #775315;
+  border: 1px solid rgba(217, 103, 69, 0.38);
+  background: rgba(217, 103, 69, 0.12);
+  color: #9a452d;
 }
 
 .admin-role-pill {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  background: rgba(31, 27, 22, 0.08);
+  background: rgba(23, 35, 31, 0.08);
   color: var(--color-walnut);
   padding: 0.25rem 0.625rem;
   font-size: 0.72rem;

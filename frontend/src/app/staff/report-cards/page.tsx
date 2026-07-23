@@ -353,7 +353,7 @@ export default function StaffReportCardsPage() {
                 <td className="whitespace-nowrap">{entityName(report.coach)}</td>
                 <td className="whitespace-nowrap">{new Date(report.createdAt).toLocaleDateString()}</td>
                 <td className="whitespace-nowrap">
-                  <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${report.isPublished ? "border-[rgba(63,107,92,0.22)] bg-[var(--color-pine)]/10 text-[var(--color-pine-deep)]" : "border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]"}`}>
+                  <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${report.isPublished ? "border-[rgba(35,96,75,0.22)] bg-[var(--color-pine)]/10 text-[var(--color-pine-deep)]" : "border-[rgba(217,103,69,0.32)] bg-[var(--color-gold)]/15 text-[var(--color-ember-deep)]"}`}>
                     {report.isPublished ? "Published" : "Draft"}
                   </span>
                 </td>

@@ -5,7 +5,7 @@ import { Calendar, CheckCircle, Clock, Loader2, MessageCircle, RefreshCw, Search
 import PageHeader from "@/components/admin/PageHeader";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { secondaryButtonClass } from "@/components/admin/FormField";
-import { getClasses, type ClassItem } from "@/lib/adminApi";
+import { getClasses, startClass, type ClassItem } from "@/lib/adminApi";
 
 function localDateValue() {
   const value = new Date();
@@ -49,7 +49,7 @@ function formatBoundary(value: string, timezone?: string) {
   }
 }
 
-function LiveAccess({ cls, now }: { cls: ClassItem; now: Date }) {
+function LiveAccess({ cls, now, onStart }: { cls: ClassItem; now: Date; onStart: (classItem: ClassItem) => void }) {
   const whatsappLink = typeof cls.batch === "object" ? cls.batch?.whatsappCommunityLink : undefined;
   let accessState: ReactNode;
 
@@ -65,14 +65,13 @@ function LiveAccess({ cls, now }: { cls: ClassItem; now: Date }) {
     accessState = <span className="text-xs font-semibold text-[var(--color-muted)]">Access closed</span>;
   } else {
     accessState = (
-      <a
-        href={cls.meetingLink}
-        target="_blank"
-        rel="noopener noreferrer"
+      <button
+        type="button"
+        onClick={() => onStart(cls)}
         className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-ember)] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[var(--color-ember-deep)]"
       >
-        <Video className="h-3.5 w-3.5" /> Start Now
-      </a>
+        <Video className="h-3.5 w-3.5" /> {cls.startedAt ? "Open Class" : "Start Now"}
+      </button>
     );
   }
 
@@ -154,6 +153,17 @@ export default function StaffClassesPage() {
   const scheduledCount = classes.filter((cls) => cls.status === "scheduled").length;
   const completedCount = classes.filter((cls) => cls.status === "completed").length;
 
+  const handleStart = (classItem: ClassItem) => {
+    // Open synchronously to avoid popup blockers, then persist the start
+    // marker in the background. The scheduler uses this marker to distinguish
+    // a coach-led class from a genuinely missed session.
+    if (classItem.meetingLink) window.open(classItem.meetingLink, "_blank", "noopener,noreferrer");
+    void startClass(classItem._id).then((response) => {
+      if (!response.success) setError(response.error || "Could not record the class start.");
+      else setClasses((current) => current.map((item) => item._id === classItem._id ? { ...item, startedAt: response.data?.startedAt || new Date().toISOString() } : item));
+    }).catch(() => setError("Could not record the class start. The meeting link was opened; please try again."));
+  };
+
   return (
     <div>
       <PageHeader title="Classes" description="Your regular and cover-up classes for the selected day, with live access timing." />
@@ -217,7 +227,7 @@ export default function StaffClassesPage() {
                     <td className="whitespace-nowrap admin-primary-cell">{cls.course}</td>
                     <td className="whitespace-nowrap">{getBatchName(cls.batch)}</td>
                     <td className="whitespace-nowrap">
-                      <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${cls.classType === "extra" ? "border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]" : "border-[rgba(63,107,92,0.22)] bg-[var(--color-pine)]/10 text-[var(--color-pine-deep)]"}`}>
+                      <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${cls.classType === "extra" ? "border-[rgba(217,103,69,0.32)] bg-[var(--color-gold)]/15 text-[var(--color-ember-deep)]" : "border-[rgba(35,96,75,0.22)] bg-[var(--color-pine)]/10 text-[var(--color-pine-deep)]"}`}>
                         {cls.classType === "extra" ? "Cover-up" : "Regular"}
                       </span>
                     </td>
@@ -240,7 +250,7 @@ export default function StaffClassesPage() {
                         <StatusBadge status={cls.status} />
                       </div>
                     </td>
-                    <td className="whitespace-nowrap"><LiveAccess cls={cls} now={now} /></td>
+                    <td className="whitespace-nowrap"><LiveAccess cls={cls} now={now} onStart={handleStart} /></td>
                   </tr>
                 ))}
               </tbody>

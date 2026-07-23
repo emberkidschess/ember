@@ -63,14 +63,88 @@ function uniqueSources(retrieved: RetrievedKnowledge[]) {
     .map(({ title, url }) => ({ title, url }));
 }
 
+const feeQuestionTerms = [
+  'fee',
+  'fees',
+  'price',
+  'pricing',
+  'cost',
+  'tuition',
+  'charge',
+  'charges',
+  'discount',
+  'scholarship',
+  'शुल्क',
+  'फीस',
+  'कीमत',
+  'दाम',
+  'पैसे',
+];
+
+const batchSizeQuestionTerms = [
+  'how many students',
+  'how many kids',
+  'students per batch',
+  'batch size',
+  'batch strength',
+  'batch capacity',
+  'kitne students',
+  'kitne bache',
+  'कितने स्टूडेंट',
+  'कितने बच्चे',
+  'premium group',
+  'standard batch',
+  '1:1',
+  'one to one',
+  'one-on-one',
+];
+
+export function isFeeQuestion(question: string): boolean {
+  const normalized = question.toLowerCase();
+  return feeQuestionTerms.some((term) => normalized.includes(term));
+}
+
+export function isBatchSizeQuestion(question: string): boolean {
+  const normalized = question.toLowerCase();
+  const mentionsBatch = normalized.includes('batch') || normalized.includes('बैच');
+  return (
+    batchSizeQuestionTerms.some((term) => normalized.includes(term)) &&
+    (mentionsBatch || normalized.includes('students') || normalized.includes('बच्चे'))
+  );
+}
+
 export async function createAcademyAnswerStream(
   question: string,
   history: ChatHistoryMessage[],
   abortSignal?: AbortSignal
 ): Promise<AcademyAnswerStream> {
   const cleanHistory = compactHistory(history);
-  const retrieved = await retrieveKnowledge(retrievalQuery(question, cleanHistory));
   const contact = await getPublicContactDetails();
+
+  if (isFeeQuestion(question)) {
+    return {
+      outOfScope: true,
+      fallbackText:
+        `Our fees and package options are shared personally by an academy consultant, because the right plan depends on your child’s level and learning needs. ` +
+        `Please speak with our team for the latest options—we’ll be happy to guide you at ${contact.email}, ` +
+        `${contact.phone}, or WhatsApp: ${contact.whatsappHref}.`,
+      sources: [],
+    };
+  }
+
+  if (isBatchSizeQuestion(question)) {
+    return {
+      outOfScope: true,
+      fallbackText:
+        `We have a few learning formats so every child gets the right level of attention: 1:1 personalised coaching, ` +
+        `small Premium Groups with 2–3 students, and Standard Groups with 5–6 students. ` +
+        `Our consultant can help you choose the best option and share the current timings. You can reach us at ` +
+        `${contact.email}, ${contact.phone}, or WhatsApp: ${contact.whatsappHref}.`,
+      sources: [],
+    };
+  }
+
+  const retrieved = await retrieveKnowledge(retrievalQuery(question, cleanHistory));
 
   if (!isAcademyRelated(`${cleanHistory.map((item) => item.content).join(' ')} ${question}`, retrieved)) {
     return {
@@ -109,7 +183,7 @@ ${question}
 `.trim();
 
   const stream = await getClient().models.generateContentStream({
-    model: process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash',
+    model: process.env.GEMINI_CHAT_MODEL || 'gemini-3.5-flash',
     contents: prompt,
     config: {
       abortSignal,

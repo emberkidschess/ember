@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Users,
@@ -53,6 +54,7 @@ const ADMIN_NAV_GROUPS: NavGroup[] = [
       { href: "/admin/payment-links", icon: CreditCard, label: "Payment Links" },
       { href: "/admin/packages", icon: FileText, label: "Packages" },
       { href: "/admin/staff", icon: GraduationCap, label: "Staff" },
+      { href: "/admin/reports", icon: FileText, label: "Coach Reports" },
     ],
   },
 ];
@@ -222,16 +224,16 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 h-screen w-[260px] bg-[var(--color-walnut)] text-[var(--color-paper)] flex flex-col z-50 transition-transform lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed lg:sticky top-0 left-0 h-screen w-[260px] bg-[#fbfcfb] text-[var(--color-walnut)] border-r border-[#dce3df] flex flex-col z-50 transition-transform lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
       >
-        <div className="flex items-center justify-between px-6 h-16 border-b border-white/10 shrink-0">
-          <Link href={`/${portal}/dashboard`} className="font-[family-name:var(--font-playfair)] font-bold text-lg">
-            EmberKids <span className="text-[var(--color-gold)]">{portal === "admin" ? "Admin" : (user.role === "coach" ? "Coach" : "Staff")}</span>
+        <div className="flex items-center justify-between px-6 h-16 border-b border-[#dce3df] shrink-0">
+          <Link href={`/${portal}/dashboard`} className="font-[family-name:var(--font-playfair)] font-bold text-lg text-[var(--color-walnut)]">
+            Ember<span className="text-[var(--color-ember)]">Kids</span> <span className="text-[var(--color-muted)]">{portal === "admin" ? "Admin" : (user.role === "coach" ? "Coach" : "Staff")}</span>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-white/70 hover:text-white"
+            className="lg:hidden text-[#56635e] hover:text-[var(--color-walnut)]"
             aria-label="Close menu"
           >
             <X className="h-5 w-5" />
@@ -241,7 +243,7 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
           {navGroups.map((group) => (
             <div key={group.label}>
-              <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white/40 mb-2">
+              <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#75817c] mb-2">
                 {group.label}
               </p>
               <div className="space-y-0.5">
@@ -254,8 +256,8 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
                       href={item.href}
                       onClick={() => setSidebarOpen(false)}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${active
-                          ? "bg-[var(--color-ember)] text-white"
-                          : "text-white/70 hover:bg-white/5 hover:text-white"
+                          ? "bg-gradient-to-r from-[#e04a15] to-[#c73d0e] text-white shadow-lg shadow-[#e04a15]/20"
+                          : "text-[#586660] hover:bg-[#f5e6e0] hover:text-[var(--color-walnut)]"
                         }`}
                     >
                       <Icon className="h-[18px] w-[18px] shrink-0" />
@@ -268,10 +270,10 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
           ))}
         </nav>
 
-        <div className="p-3 border-t border-white/10">
+        <div className="p-3 border-t border-[#dce3df]">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#586660] hover:bg-[#f5e6e0] hover:text-[var(--color-walnut)] transition-colors"
           >
             <LogOut className="h-[18px] w-[18px]" />
             Sign Out
@@ -297,9 +299,13 @@ export default function DashboardShell({ portal, children }: DashboardShellProps
               onClick={() => setUserMenuOpen((v) => !v)}
               className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-full hover:bg-[var(--color-ivory)] transition-colors"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-ember)] text-white text-sm font-bold">
-                {user.name?.[0]?.toUpperCase() || "U"}
-              </span>
+              <Image
+                src="https://res.cloudinary.com/aaa97ofg/image/upload/v1783288889/chess-academy/fav.png"
+                alt="logo"
+                width={32}
+                height={32}
+                className="w-8 h-8 object-contain"
+              />
               <span className="hidden sm:block text-sm font-medium text-[var(--color-walnut)]">{user.name}</span>
               <ChevronDown className="hidden sm:block h-4 w-4 text-[var(--color-muted)]" />
             </button>

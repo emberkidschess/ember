@@ -10,6 +10,7 @@ import {
   cancelClass,
   getClassStats,
   getMyClasses,
+  startClass,
   getClassJoinStatus,
   scheduleTrialClass,
   rescheduleTrialClass,
@@ -75,6 +76,7 @@ router.post(
 
 // Time-gate polling: any authenticated staff/coach can check (read-only,
 // no sensitive data) - kept above /:id since it's a literal sub-path.
+router.post('/:id/start', strictLimiter, authenticate, requireStaffOrAdmin, requireAnyPermission('schedule_classes', 'create_edit_class', 'assign_staff_to_class'), (req: AuthRequest, res) => startClass(req, res));
 router.get('/:id/join-status', authenticate, requireStaffOrAdmin, requireAnyPermission('schedule_classes', 'create_edit_class', 'assign_students_to_class', 'assign_staff_to_class', 'reschedule_class', 'cancel_class', 'post_class_notes', 'schedule_trial', 'mark_trial_result'), (req: AuthRequest, res) => getClassJoinStatus(req, res));
 
 router.get('/:id', authenticate, requireStaffOrAdmin, requireAnyPermission('schedule_classes', 'create_edit_class', 'assign_students_to_class', 'assign_staff_to_class', 'reschedule_class', 'cancel_class', 'post_class_notes', 'schedule_trial', 'mark_trial_result'), (req: AuthRequest, res) => getClassById(req, res));

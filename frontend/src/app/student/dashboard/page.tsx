@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createAvatar } from "@dicebear/core";
 import { adventurer } from "@dicebear/collection";
@@ -78,6 +78,10 @@ function titleCase(value?: string) {
   return value
     .replaceAll("_", " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function notificationPreview(value: string): string {
+  return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function formatClassDate(date: string, weekday: "short" | "long" = "short") {
@@ -449,6 +453,7 @@ export default function StudentDashboardPage() {
   const [notifications, setNotifications] = useState<StudentNotification[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const knownNotificationIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let timer: number | undefined;
@@ -503,22 +508,55 @@ export default function StudentDashboardPage() {
   }, [router]);
 
   useEffect(() => {
-    const loadNotifications = async () => {
+    let cancelled = false;
+    const loadNotifications = async (showDeviceAlert = false) => {
       try {
-        setLoadingNotifications(true);
+        if (!showDeviceAlert) setLoadingNotifications(true);
         const response = await getStudentNotifications();
-        if (response.success) {
-          setNotifications(response.data);
+        if (response.success && !cancelled) {
+          const nextNotifications = response.data || [];
+          if (showDeviceAlert && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+            nextNotifications
+              .filter((notification) => notification.type === "class_reminder" && notification.status === "sent" && !knownNotificationIds.current.has(notification._id))
+              .slice(0, 3)
+              .forEach((notification) => {
+                new Notification(notification.content.subject || "Class reminder", {
+                  body: notificationPreview(notification.content.body).slice(0, 180),
+                  icon: "/icon-192.png",
+                });
+              });
+          }
+          knownNotificationIds.current = new Set(nextNotifications.map((notification) => notification._id));
+          setNotifications(nextNotifications);
         }
       } catch (error) {
         console.error('Failed to load notifications:', error);
       } finally {
-        setLoadingNotifications(false);
+        if (!showDeviceAlert) setLoadingNotifications(false);
       }
     };
 
-    loadNotifications();
+    void loadNotifications();
+    const intervalId = window.setInterval(() => { void loadNotifications(true); }, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, []);
+
+  const enableDeviceAlerts = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setNotice({ tone: "info", message: "This browser does not support device alerts. Email reminders will still be sent." });
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    setNotice({
+      tone: permission === "granted" ? "success" : "info",
+      message: permission === "granted"
+        ? "Device alerts are enabled while the student portal is open."
+        : "Device alerts were not enabled. Email reminders will still be sent.",
+    });
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -1708,7 +1746,12 @@ export default function StudentDashboardPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-[#e5eae7] px-6 py-4">
-              <h3 className="font-bold text-lg">Notifications</h3>
+              <div>
+                <h3 className="font-bold text-lg">Notifications</h3>
+                <button type="button" onClick={() => void enableDeviceAlerts()} className="mt-1 text-xs font-semibold text-[#d96745] hover:underline">
+                  Enable device alerts
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowNotificationModal(false)}
@@ -1747,7 +1790,9 @@ export default function StudentDashboardPage() {
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <h4 className="font-semibold text-sm">{notification.content.subject || titleCase(notification.type)}</h4>
-                              <p className="mt-1 text-sm text-[#66736e]">{notification.content.body}</p>
+                              <p className="mt-1 text-sm text-[#66736e]">
+                                {notification.type === "class_reminder" ? notificationPreview(notification.content.body) : notification.content.body}
+                              </p>
                             </div>
                             <span className="flex shrink-0 items-center gap-1 text-xs text-[#85908b]">
                               {notification.channel === 'email' && <Mail className="h-3 w-3" />}

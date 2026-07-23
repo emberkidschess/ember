@@ -7,10 +7,10 @@ interface StatCardProps {
 }
 
 const ACCENT_CLASSES: Record<string, string> = {
-  ember: "border-[rgba(199,93,60,0.22)] bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)]",
-  pine: "border-[rgba(63,107,92,0.22)] bg-[var(--color-pine)]/10 text-[var(--color-pine-deep)]",
-  gold: "border-[rgba(224,163,61,0.32)] bg-[var(--color-gold)]/15 text-[#8a6418]",
-  walnut: "border-[rgba(31,27,22,0.16)] bg-[var(--color-walnut)]/10 text-[var(--color-walnut)]",
+  ember: "border-[rgba(224,74,21,0.22)] bg-[var(--color-ember)]/10 text-[var(--color-ember-deep)]",
+  pine: "border-[rgba(35,96,75,0.22)] bg-[var(--color-pine)]/10 text-[var(--color-pine-deep)]",
+  gold: "border-[rgba(217,103,69,0.32)] bg-[var(--color-gold)]/15 text-[var(--color-ember-deep)]",
+  walnut: "border-[rgba(23,35,31,0.16)] bg-[var(--color-walnut)]/10 text-[var(--color-walnut)]",
 };
 
 export default function StatCard({ label, value, icon: Icon, accent = "walnut", hint }: StatCardProps) {

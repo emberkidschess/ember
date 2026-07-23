@@ -74,7 +74,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
         aria-labelledby={titleId}
         tabIndex={-1}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-line)] bg-[rgba(255,253,248,0.94)] px-6 py-4 backdrop-blur-md">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-line)] bg-[rgba(255,255,255,0.94)] px-6 py-4 backdrop-blur-md">
           <h2 id={titleId} className="font-[family-name:var(--font-playfair)] text-xl font-bold text-[var(--color-walnut)]">{title}</h2>
           <button
             onClick={onClose}
